@@ -9,7 +9,7 @@ Sim diag (SIM_STATS=1): ~24% squad deaths <35s (2 mechs or drones); half alive t
 
 ## NEXT ACTION (on resume)
 Server: A survivor 2.50, B controlled 2.40, C heal 2.90 (all < 3.04 base 90e4970). Cautious play LOSES kills -> stay aggressive branch (VARIANT=base).
-Sim ranks matched server. fad65d9 (fire_tol 1.3) submitted BB-DD854E3C - read score.
+Sim ranks matched server. fad65d9 (fire_tol 1.3) = 3.25 NEW BEST. Aggression probes (push/finish/bands) all worse in sim.
 Probed no-effect: laser_tol, weapon pref (laser>lightning>mortar is best), loot_enemy_r.
 
 ## Next
