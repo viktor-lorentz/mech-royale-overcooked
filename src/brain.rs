@@ -358,7 +358,7 @@ impl Brain {
                     a.drop = Some(1);
                 }
             }
-        } else if enemies.is_empty() {
+        } else if enemies.first().map(|e| self.p.cube_enemy_r > 0.0 && dist(e.pos, pos) > self.p.cube_enemy_r).unwrap_or(true) {
             let mut best = f64::MAX;
             let mut got_cube = false;
             for c in &o.cubes {
