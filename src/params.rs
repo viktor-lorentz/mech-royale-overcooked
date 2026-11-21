@@ -1,7 +1,7 @@
 //! Every behaviour tunable in one place. Defaults = the shipped bot; the simulator can override them per run.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(default)]
 pub struct Params {
     pub laser_band: [f64; 2],

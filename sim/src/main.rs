@@ -51,6 +51,7 @@ fn main() {
         field_brains: 1,
         arena_host: String::new(),
         ext_budget_ms: 60,
+        field_n: usize::MAX,
         params: Default::default(),
     };
     let mut threads = 0usize;
@@ -102,6 +103,11 @@ fn main() {
             }
             "--field-brains" => o.field_brains = val().parse().unwrap_or_else(|_| usage()),
             "--arena-host" => o.arena_host = val(),
+            "--field-n" => o.field_n = val().parse().unwrap_or_else(|_| usage()),
+            "--dump-params" => {
+                println!("{}", serde_json::to_string_pretty(&o.params).unwrap());
+                return;
+            }
             "--params" => {
                 let v = val();
                 let txt = if v.trim_start().starts_with('{') { v } else { std::fs::read_to_string(&v).unwrap_or_else(|_| usage()) };

@@ -35,6 +35,7 @@ pub struct Opts {
     pub field_brains: usize,
     pub arena_host: String,
     pub ext_budget_ms: u64,
+    pub field_n: usize,
     pub params: mech_bot::params::Params,
 }
 
@@ -166,7 +167,7 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
             for s in 0..n {
                 names[s] = if s < o.field_brains.max(1) {
                     "brain".into()
-                } else if k < imgs.len() {
+                } else if k < imgs.len() && k < o.field_n {
                     k += 1;
                     format!("img:{}", imgs[k - 1])
                 } else {
@@ -323,7 +324,7 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
     }
     for s in 0..n {
         if let Ctl::Ext(b) = &mut ctls[s] {
-            eprintln!("ext {} slot {} answered={} late={} alive_proc={} place={}", b.name, s, b.answered, b.late, b.alive, sim.mechs[s].alive);
+            eprintln!("EXT\t{}\t{}\t{}\t{}", b.name, if sim.mechs[s].place == 0 { 1 } else { sim.mechs[s].place }, b.answered, b.late);
             b.end(1, 0);
         }
     }
