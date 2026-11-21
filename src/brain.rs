@@ -581,11 +581,19 @@ impl Brain {
                 fire[0] = true;
             }
             want = if dist2d(pos, cr.pos) > 25.0 { Some([cr.pos[0], cr.pos[1]]) } else { None };
-        } else if let Some((ht, hb)) = self.hit_bearing {
+        } else if let Some((ht, hb)) = self.hit_bearing.filter(|(ht, _)| o.t - *ht < 2.0) {
             // someone we can't see just hurt us: turn to face them (rear armor is x1.5)
-            if o.t - ht < 2.0 {
-                aim = [hb, 0.0];
-            }
+            let _ = ht;
+            aim = [hb, 0.0];
+        } else if let Some(sd) = o
+            .sounds
+            .iter()
+            .filter(|s| matches!(s.kind.as_str(), "gun" | "laser" | "laser_charge" | "lightning" | "mortar") && s.dist != "far" && s.age < 0.5)
+            .min_by(|a, b| a.age.partial_cmp(&b.age).unwrap())
+        {
+            // heard a weapon nearby: look that way so the threat enters our vision wedge
+            self.hit_bearing = Some((o.t - 1.2, sd.bearing));
+            aim = [sd.bearing, 0.0];
         }
 
         // ---- movement
