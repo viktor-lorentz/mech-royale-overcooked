@@ -8,6 +8,7 @@ Server best 3.04 (90e4970). Rank ~60/108; top-32 cut ~4.1 -> squad score is the 
 Sim diag (SIM_STATS=1): ~24% squad deaths <35s (2 mechs or drones); half alive time unarmed.
 
 ## NEXT ACTION (on resume)
+SERVER IS DETERMINISTIC (fad65d9 resubmit = 3.25 again). Server = exact paired oracle for practice. Hill-climb with single-change commits off best (tools/exp.sh). Sim = generalization sanity check.
 7b03e83 second_avoid 1.6: sim val +0.2 but SERVER 2.77 (vs 3.25) -> reverted to 0. Resubmitting fad65d9 to measure server noise.
 Server: A survivor 2.50, B controlled 2.40, C heal 2.90 (all < 3.04 base 90e4970). Cautious play LOSES kills -> stay aggressive branch (VARIANT=base).
 Sim ranks matched server. fad65d9 (fire_tol 1.3) = 3.25 NEW BEST. Aggression probes (push/finish/bands) all worse in sim.
