@@ -7,6 +7,9 @@ Submit only when local beats best-submitted clearly AND docker sandbox check pas
 Server best 3.04 (90e4970). Rank ~60/108; top-32 cut ~4.1 -> squad score is the gate. Field (real bots) mean place ~8.
 Sim diag (SIM_STATS=1): ~24% squad deaths <35s (2 mechs or drones); half alive time unarmed.
 
+## PAUSED (Sat 03:30 ET) by user to save tokens. Final entry = 270db05 (3.38, BB-826B06B9).
+If resumed: submit queued exps e2c5e10 (second_avoid0.6), 38c9d35 (drone_avoid1.6), 4701757 (hurt_hp0.3) via tools/exp.sh flow.
+
 ## NEXT ACTION (on resume)
 SERVER IS DETERMINISTIC (fad65d9 resubmit = 3.25 again). Server = exact paired oracle for practice. Hill-climb with single-change commits off best (tools/exp.sh). Sim = generalization sanity check.
 7b03e83 second_avoid 1.6: sim val +0.2 but SERVER 2.77 (vs 3.25) -> reverted to 0. Resubmitting fad65d9 to measure server noise.
@@ -30,3 +33,4 @@ Probed no-effect: laser_tol, weapon pref (laser>lightning>mortar is best), loot_
 - 90e4970 drone awareness + face attackers (3.04). 391d45d pickup memory (+0.17 squad sim).
 - No effect: gauntlet low-hp targeting, always-Royale in field, outnumbered->cover, hurt_hp/cover_exit tweaks.
 - v0..v6 (see results.tsv); A* capped at 12k expansions; Royale threshold 3 deaths.
+queued: e2c5e10 second_avoid0.6 | 38c9d35 drone_avoid1.6 | 4701757 hurt_hp0.3 (all on fire_tol1.6 base)

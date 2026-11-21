@@ -14,3 +14,4 @@ fad65d9	2.655(val sq768)	-	-	yes	3.25	BB-DD854E3C	-	base(pickup mem)+fire_tol 1.
 7b03e83	2.850(val sq768)	9.182	-	yes	2.77	BB-D6741CF3	-	second_avoid 1.6: drift away from other mechs while dueling (val base 2.655/9.081)
 fad65d9	-	-	-	yes	3.25	BB-95BFD282	-	RESUBMIT: identical 3.25 -> server DETERMINISTIC same commit to measure server noise
 270db05	-	-	-	yes	3.38	BB-826B06B9	-	EXP fire_tol 1.6 (vs fad65d9 3.25)
+ba9e9f4	-	-	-	yes	3.02	BB-BE62F67D	-	EXP fire_tol 2.0 (vs 3.38)
