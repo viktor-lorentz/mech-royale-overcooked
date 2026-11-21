@@ -35,6 +35,9 @@ pub struct Brain {
     sy0: f64,
     explore: Option<[f64; 2]>,
     explore_t: f64,
+    last_alive: u32,
+    others_dead: u32,
+    pub royale: bool,
 }
 
 fn hp_frac_early(me: &SelfObs) -> f64 {
@@ -85,6 +88,9 @@ impl Brain {
             sy0,
             explore: None,
             explore_t: -10.0,
+            last_alive: 0,
+            others_dead: 0,
+            royale: false,
         }
     }
 
@@ -188,6 +194,18 @@ impl Brain {
         let muzzle = [pos[0], pos[1], pos[2] + 7.0 * size];
         let mut a = Action { tick: o.tick, ..Default::default() };
 
+        // ---- FFA detector: house squads never kill each other, so deaths we did not cause mean a free-for-all
+        let my_kills_now = o.events.iter().filter(|e| e.t == "kill").count() as u32;
+        if self.last_alive > 0 && o.alive < self.last_alive {
+            let died = self.last_alive - o.alive;
+            self.others_dead += died.saturating_sub(my_kills_now);
+            if self.others_dead >= 2 && !self.royale {
+                self.royale = true;
+                eprintln!("ROYALE mode at t={:.1} alive={}", o.t, o.alive);
+            }
+        }
+        self.last_alive = o.alive;
+
         // ---- events
         for e in &o.events {
             if e.t == "damaged" {
@@ -201,14 +219,19 @@ impl Brain {
 
         // ---- upgrade offers
         if let Some(of) = &o.offer {
-            const PREF: [&str; 16] = [
+            const PREF_G: [&str; 16] = [
                 "laser_charge", "laser_damage", "plating", "armor", "gun_damage", "gun_rate", "lightning_efficiency",
                 "nanites", "lightning_range", "gyros", "gun_velocity", "gun_mag", "mortar_reload", "servos", "lightning_chain", "reactor",
             ];
+            const PREF_R: [&str; 16] = [
+                "plating", "armor", "laser_charge", "nanites", "laser_damage", "gun_damage", "lightning_efficiency", "gun_rate",
+                "sensors", "gyros", "lightning_range", "servos", "gun_velocity", "gun_mag", "mortar_reload", "reactor",
+            ];
+            let pref: &[&str] = if self.royale { &PREF_R } else { &PREF_G };
             let mut best = 0usize;
             let mut best_rank = usize::MAX;
             for (i, c) in of.choices.iter().enumerate() {
-                let r = PREF.iter().position(|p| *p == c.id).unwrap_or(99);
+                let r = pref.iter().position(|p| *p == c.id).unwrap_or(99);
                 if r < best_rank {
                     best_rank = r;
                     best = i;
@@ -391,7 +414,16 @@ impl Brain {
         let gun_speed = gun.and_then(|g| g.stats.get("speed")).copied().unwrap_or(252.0);
         let gun_range = gun.and_then(|g| g.stats.get("range")).copied().unwrap_or(230.0);
         let mut engaged = false;
-        let target = enemies.first().copied().or_else(|| {
+        let royale = self.royale;
+        let target = (if royale {
+            enemies.iter().copied().min_by(|a, b| {
+                let sc = |m: &Actor| dist(m.pos, pos) + 160.0 * (m.hp.unwrap_or(1400.0) / m.max_hp.unwrap_or(1400.0).max(1.0));
+                sc(a).partial_cmp(&sc(b)).unwrap()
+            })
+        } else {
+            enemies.first().copied()
+        })
+        .or_else(|| {
             drones.iter().copied().filter(|d| dist(d.pos, pos) < 35.0).min_by(|a, b| dist(a.pos, pos).partial_cmp(&dist(b.pos, pos)).unwrap())
         });
         let hp_frac = me.hp / me.max_hp.max(1.0);
@@ -504,7 +536,7 @@ impl Brain {
                     -1.0
                 } else if finishing && d > 25.0 {
                     0.7
-                } else if d > far {
+                } else if d > far && !(royale && t_frac > 0.5) {
                     0.6
                 } else if d < near {
                     -0.8
