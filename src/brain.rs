@@ -274,7 +274,17 @@ impl Brain {
                 "plating", "armor", "laser_charge", "nanites", "laser_damage", "gun_damage", "lightning_efficiency", "gun_rate",
                 "sensors", "gyros", "lightning_range", "servos", "gun_velocity", "gun_mag", "mortar_reload", "reactor",
             ];
-            let pref: &[&str] = if self.royale || self.p.survival_upgrades { &PREF_R } else { &PREF_G };
+            const PREF_GUN: [&str; 16] = [
+                "gun_damage", "gun_rate", "laser_charge", "laser_damage", "plating", "armor", "gun_mag", "lightning_efficiency",
+                "nanites", "gyros", "gun_velocity", "lightning_range", "mortar_reload", "servos", "lightning_chain", "reactor",
+            ];
+            const PREF_TANK: [&str; 16] = [
+                "plating", "armor", "gun_damage", "laser_charge", "laser_damage", "gun_rate", "nanites", "lightning_efficiency",
+                "gyros", "gun_mag", "gun_velocity", "lightning_range", "mortar_reload", "servos", "lightning_chain", "reactor",
+            ];
+            let pref: &[&str] = if self.royale || self.p.survival_upgrades { &PREF_R } else {
+                match self.p.upg_order { 1 => &PREF_GUN, 2 => &PREF_TANK, _ => &PREF_G }
+            };
             let mut best = 0usize;
             let mut best_rank = usize::MAX;
             for (i, c) in of.choices.iter().enumerate() {
@@ -628,6 +638,14 @@ impl Brain {
                         self.strafe_sign = -self.strafe_sign;
                         perp = toward + self.strafe_sign * PI / 2.0;
                         m = [perp.cos() + radial * toward.cos(), perp.sin() + radial * toward.sin()];
+                    }
+                }
+                // keep the fight 1v1: drift away from other mechs closing in while we duel this one
+                if self.p.second_avoid > 0.0 {
+                    for e in enemies.iter().filter(|e| e.id != t.id && dist2d(e.pos, pos) < self.p.second_r) {
+                        let away = yaw_to(e.pos, pos);
+                        m[0] += self.p.second_avoid * away.cos();
+                        m[1] += self.p.second_avoid * away.sin();
                     }
                 }
                 // stay out of drone range while dueling a mech (each drone adds 25 dps)

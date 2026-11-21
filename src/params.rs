@@ -27,6 +27,8 @@ pub struct Params {
     pub drone_hp: f64,
     pub drone_target_r: f64,
     pub drone_avoid: f64,
+    pub second_avoid: f64,
+    pub second_r: f64,
     pub cube_r: f64,
     pub crate_r: f64,
     pub crate_r_unarmed: f64,
@@ -41,6 +43,7 @@ pub struct Params {
     pub attacker_switch: f64,
     pub face_unseen: bool,
     pub survival_upgrades: bool,
+    pub upg_order: u32, // 0 laser-first, 1 gun-first, 2 tank
     pub pref: [i32; 3], // laser, lightning, mortar
     pub cover_window: f64,
 }
@@ -93,6 +96,8 @@ impl Params {
             drone_hp: 0.5,
             drone_target_r: 48.0,
             drone_avoid: 0.8,
+            second_avoid: 1.6,
+            second_r: 150.0,
             cube_r: 50.0,
             crate_r: 60.0,
             crate_r_unarmed: 60.0,
@@ -107,6 +112,7 @@ impl Params {
             attacker_switch: 1.5,
             face_unseen: true,
             survival_upgrades: false,
+            upg_order: 0,
             pref: [3, 2, 1],
             cover_window: 8.0,
         }
