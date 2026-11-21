@@ -201,9 +201,9 @@ impl Brain {
 
         // ---- upgrade offers
         if let Some(of) = &o.offer {
-            const PREF: [&str; 12] = [
-                "plating", "armor", "laser_charge", "laser_damage", "nanites", "gyros", "servos", "gun_damage",
-                "gun_rate", "mortar_reload", "lightning_chain", "reactor",
+            const PREF: [&str; 16] = [
+                "laser_charge", "laser_damage", "plating", "armor", "gun_damage", "gun_rate", "lightning_efficiency",
+                "nanites", "lightning_range", "gyros", "gun_velocity", "gun_mag", "mortar_reload", "servos", "lightning_chain", "reactor",
             ];
             let mut best = 0usize;
             let mut best_rank = usize::MAX;
@@ -491,7 +491,26 @@ impl Brain {
                 }
                 let toward = yaw_to(pos, t.pos);
                 let low = hp_frac < 0.3 && enemies.len() >= 1;
-                let radial = if low { -1.0 } else if d > 60.0 { 0.6 } else if d < 35.0 { -0.8 } else { 0.0 };
+                // preferred engagement band depends on what we carry (laser duels at range, lightning brawls)
+                let (near, far) = match w1.map(|w| w.kind.as_str()) {
+                    Some("laser") => (80.0, 150.0),
+                    Some("lightning") => (20.0, 38.0),
+                    Some("mortar") => (60.0, 140.0),
+                    _ => (40.0, 90.0),
+                };
+                let t_frac = t.hp.unwrap_or(1.0) / t.max_hp.unwrap_or(1400.0).max(1.0);
+                let finishing = t_frac < 0.35 && hp_frac > 0.5;
+                let radial = if low {
+                    -1.0
+                } else if finishing && d > 25.0 {
+                    0.7
+                } else if d > far {
+                    0.6
+                } else if d < near {
+                    -0.8
+                } else {
+                    0.0
+                };
                 let mut perp = toward + self.strafe_sign * PI / 2.0;
                 let mut m = [perp.cos() + radial * toward.cos(), perp.sin() + radial * toward.sin()];
                 if let Some(nav) = &self.nav {
