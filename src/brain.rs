@@ -466,6 +466,11 @@ impl Brain {
                 let sc = |m: &Actor| dist(m.pos, pos) + self.p.royale_hp_w * (m.hp.unwrap_or(1400.0) / m.max_hp.unwrap_or(1400.0).max(1.0));
                 sc(a).partial_cmp(&sc(b)).unwrap()
             })
+        } else if self.p.gauntlet_hp_w > 0.0 {
+            enemies.iter().copied().filter(|m| dist(m.pos, pos) < 200.0).min_by(|a, b| {
+                let sc = |m: &Actor| dist(m.pos, pos) + self.p.gauntlet_hp_w * (m.hp.unwrap_or(1400.0) / m.max_hp.unwrap_or(1400.0).max(1.0));
+                sc(a).partial_cmp(&sc(b)).unwrap()
+            }).or_else(|| enemies.first().copied())
         } else {
             enemies.first().copied()
         })

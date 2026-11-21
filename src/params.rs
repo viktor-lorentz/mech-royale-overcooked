@@ -19,6 +19,7 @@ pub struct Params {
     pub push_radial: f64,
     pub retreat_radial: f64,
     pub royale_hp_w: f64,
+    pub gauntlet_hp_w: f64,
     pub royale_hold_tfrac: f64,
     pub royale_deaths: u32,
     pub infight_n: u32, // 0 = off
@@ -53,6 +54,7 @@ impl Default for Params {
             push_radial: 0.6,
             retreat_radial: 0.8,
             royale_hp_w: 160.0,
+            gauntlet_hp_w: 0.0,
             royale_hold_tfrac: 0.5,
             royale_deaths: 3,
             infight_n: 2,

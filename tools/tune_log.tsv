@@ -4,3 +4,5 @@ time	param	value	base	cand	confirm_base	confirm_cand	accepted
 18:38:54	gun_band.1	110.0	6.529	6.538	nan	nan	False
 18:45:19	cover_exit_hp	0.7200000000000001	6.829	6.839	nan	nan	False
 18:51:41	mortar_band.0	40.0	6.563	6.511	nan	nan	False
+18:58:50	finish_hp	0.6	6.751	6.755	nan	nan	False
+19:09:29	drone_hp	0.62	6.682	6.863	6.609	6.562	False
