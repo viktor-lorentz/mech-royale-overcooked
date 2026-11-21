@@ -24,6 +24,8 @@ pub struct Brain {
     strafe_sign: f64,
     strafe_flip_at: f64,
     hit_bearing: Option<(f64, f64)>, // (time, bearing)
+    cover: Option<[f64; 2]>,
+    cover_t: f64,
 }
 
 fn num(v: &Value, path: &[&str], d: f64) -> f64 {
@@ -57,6 +59,8 @@ impl Brain {
             strafe_sign: 1.0,
             strafe_flip_at: 0.0,
             hit_bearing: None,
+            cover: None,
+            cover_t: -10.0,
         }
     }
 
@@ -74,6 +78,39 @@ impl Brain {
             Some(w) => !w.blocked(a, b),
             None => true,
         }
+    }
+
+    /// Nearest nav cell around `pos` that no known threat can see (feet-to-head) and that is inside the zone.
+    fn find_cover(&self, pos: V3, threats: &[V3], zone: &Zone) -> Option<[f64; 2]> {
+        let (w, nav) = (self.world.as_ref()?, self.nav.as_ref()?);
+        for r in [8.0f64, 14.0, 20.0, 28.0, 36.0] {
+            let mut best: Option<([f64; 2], f64)> = None;
+            for k in 0..16 {
+                let ang = k as f64 * PI / 8.0;
+                let (x, y) = (pos[0] + r * ang.cos(), pos[1] + r * ang.sin());
+                if nav.is_blocked(x, y) {
+                    continue;
+                }
+                if (x - zone.center[0]).hypot(y - zone.center[1]) > zone.radius - 6.0 {
+                    continue;
+                }
+                let g = w.ground(x, y);
+                let hidden = threats.iter().all(|t| {
+                    let eye = [t[0], t[1], t[2] + 8.0];
+                    w.blocked(eye, [x, y, g + 4.5]) && w.blocked(eye, [x, y, g + 8.5])
+                });
+                if hidden {
+                    let far = threats.iter().map(|t| (t[0] - x).hypot(t[1] - y)).fold(f64::MAX, f64::min);
+                    if best.map(|b| far > b.1).unwrap_or(true) {
+                        best = Some(([x, y], far));
+                    }
+                }
+            }
+            if let Some((c, _)) = best {
+                return Some(c);
+            }
+        }
+        None
     }
 
     /// Steering direction toward `goal`, routing around obstacles. Falls back to a straight line.
@@ -174,14 +211,22 @@ impl Brain {
         let mut want: Option<[f64; 2]> = if d_goal < gr * 0.5 { None } else { Some([goal[0], goal[1]]) };
 
         // loot
-        let slot1_empty = me.weapons.get(1).map(|w| w.is_none()).unwrap_or(true);
+        let held_kind: Option<String> = me.weapons.get(1).and_then(|w| w.as_ref()).map(|w| w.kind.clone());
+        let held_pref = held_kind.as_deref().map(Self::weapon_pref).unwrap_or(-1);
         let mut pick_target: Option<&Pickup> = None;
-        if slot1_empty && enemies.is_empty() {
+        if enemies.is_empty() {
             let mut best = f64::MAX;
             for p in &o.pickups {
+                if p.kind == "gun" || Self::weapon_pref(&p.kind) <= held_pref {
+                    continue;
+                }
+                if me.weapons.iter().flatten().any(|w| w.kind == p.kind) {
+                    continue;
+                }
                 let d = dist2d(pos, p.pos);
+                let reach = if held_pref < 0 { 90.0 } else { 45.0 };
                 let sc = d - 20.0 * Self::weapon_pref(&p.kind) as f64;
-                if sc < best && d < 90.0 && p.kind != "gun" {
+                if sc < best && d < reach {
                     best = sc;
                     pick_target = Some(p);
                 }
@@ -191,6 +236,9 @@ impl Brain {
             want = Some([p.pos[0], p.pos[1]]);
             if dist2d(pos, p.pos) < self.pickup_radius - 0.5 && (p.pos[2] - pos[2]).abs() < 3.5 {
                 a.take = Some(p.id);
+                if held_pref >= 0 {
+                    a.drop = Some(1);
+                }
             }
         } else if enemies.is_empty() {
             let mut best = f64::MAX;
@@ -216,6 +264,30 @@ impl Brain {
             drones.iter().copied().filter(|d| dist(d.pos, pos) < 35.0).min_by(|a, b| dist(a.pos, pos).partial_cmp(&dist(b.pos, pos)).unwrap())
         });
         let hp_frac = me.hp / me.max_hp.max(1.0);
+        // ---- heal-cycle: when hurt with threats around, break line of sight and regenerate
+        let threats: Vec<V3> = enemies.iter().filter(|m| dist(m.pos, pos) < 160.0).map(|m| m.pos).collect();
+        let hurt = hp_frac < 0.5 && !threats.is_empty();
+        let mut hiding = false;
+        if hurt || (self.cover.is_some() && hp_frac < 0.8 && o.t - self.cover_t < 8.0) {
+            if o.t - self.cover_t > 0.6 || self.cover.is_none() {
+                if !threats.is_empty() {
+                    self.cover = self.find_cover(pos, &threats, &o.zone);
+                    self.cover_t = o.t;
+                }
+            }
+            if let Some(c) = self.cover {
+                let at = (c[0] - pos[0]).hypot(c[1] - pos[1]) < 4.0;
+                if !at {
+                    want = Some(c);
+                    hiding = true;
+                } else {
+                    hiding = true;
+                    want = None;
+                }
+            }
+        } else {
+            self.cover = None;
+        }
         if let Some(t) = target {
             let tpos = [t.pos[0], t.pos[1], t.pos[2] + 4.5];
             let d = dist(muzzle, tpos);
@@ -284,6 +356,22 @@ impl Brain {
                 mv_override = Some(m);
                 if low {
                     boost = true;
+                }
+                // dodge charging lasers aimed at us
+                for e in enemies.iter().filter(|e| e.charging && dist(e.pos, pos) < 280.0) {
+                    let to_me = yaw_to(e.pos, pos);
+                    let off = wrap(e.aim[0] - to_me).abs();
+                    let dd = dist(e.pos, pos);
+                    if off < (3.5 / dd.max(8.0)).atan() + 0.12 {
+                        let side = if wrap(e.aim[0] - to_me) > 0.0 { -1.0 } else { 1.0 };
+                        let pd = e.aim[0] + side * PI / 2.0;
+                        mv_override = Some([pd.cos(), pd.sin()]);
+                        boost = true;
+                        break;
+                    }
+                }
+                if hiding && self.cover.is_some() {
+                    mv_override = None; // let steering take us to cover; keep shooting if LOS allows
                 }
             }
         } else if let Some(cr) = o.crates.iter().filter(|c| dist(c.pos, pos) < 60.0).min_by(|a, b| dist(a.pos, pos).partial_cmp(&dist(b.pos, pos)).unwrap()) {
