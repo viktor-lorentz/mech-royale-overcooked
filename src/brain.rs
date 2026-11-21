@@ -437,27 +437,45 @@ impl Brain {
             if let Some(w) = w1 {
                 match w.kind.as_str() {
                     "laser" => {
+                        // hitscan: aim at where the target will be when the next tick resolves, not at the gun lead
+                        let full = w.stats.get("charge").copied().unwrap_or(self.laser_charge);
+                        let range = w.stats.get("range").copied().unwrap_or(280.0) - 10.0;
                         let ch = w.charge.unwrap_or(0.0);
-                        if los && d < 270.0 {
-                            if ch >= self.laser_charge - 0.01 {
-                                fire[1] = false;
-                            } else if w.cooldown <= 0.05 && yaw_err < tol * 3.0 {
+                        let hp_pt = [tpos[0] + t.vel[0] * 0.1, tpos[1] + t.vel[1] * 0.1, tpos[2] + t.vel[2] * 0.1];
+                        let la = [yaw_to(muzzle, hp_pt), pitch_to(muzzle, hp_pt)];
+                        let l_tol = (2.0 / d.max(5.0)).atan() * 0.8;
+                        let l_aligned = wrap(la[0] - me.aim[0]).abs() < l_tol && (la[1] - me.aim[1]).abs() < l_tol * 1.5;
+                        if ch > 0.0 {
+                            // charging: once full, keep holding until the beam would land, then let go
+                            aim = la;
+                            if ch >= full - 0.01 {
+                                fire[1] = !(l_aligned && los);
+                            } else {
                                 fire[1] = true;
-                            } else if ch > 0.0 && yaw_err < tol * 3.0 {
+                            }
+                        } else if los && d < range && w.cooldown <= 0.05 && yaw_err < tol * 4.0 {
+                            fire[1] = true; // start charging
+                        }
+                    }
+                    "lightning" => {
+                        let range = w.stats.get("range").copied().unwrap_or(self.lightning_range);
+                        let cone = w.stats.get("cone_deg").copied().unwrap_or(30.0).to_radians();
+                        let ly = yaw_to(muzzle, tpos);
+                        if d < range && los {
+                            // lightning ignores pitch and lead: keep the yaw inside the cone
+                            if wrap(ly - me.aim[0]).abs() < cone * 0.8 && me.energy > 6.0 {
                                 fire[1] = true;
                             }
                         }
                     }
-                    "lightning" => {
-                        if los && d < self.lightning_range && yaw_err < 0.3 && me.energy > 8.0 {
-                            fire[1] = true;
-                        }
-                    }
                     "mortar" => {
-                        if d > 15.0 && d < 200.0 {
-                            if let Some(p) = mortar_pitch(dist2d(muzzle, tpos), tpos[2] - (pos[2] + 9.5), self.mortar_speed, self.mortar_g) {
-                                aim = [yaw_to(muzzle, tpos), p];
-                                if wrap(aim[0] - me.aim[0]).abs() < 0.05 && (aim[1] - me.aim[1]).abs() < 0.05 {
+                        let ms = w.stats.get("speed").copied().unwrap_or(self.mortar_speed);
+                        if (!los || d > 110.0) && w.cooldown <= 0.1 && d > 18.0 && d < 220.0 {
+                            let (mp, _) = intercept(muzzle, tpos, t.vel, ms * 0.8);
+                            if let Some(p) = mortar_pitch(dist2d(muzzle, mp), mp[2] - (pos[2] + 9.5 * size), ms, self.mortar_g) {
+                                aim = [yaw_to(muzzle, mp), p];
+                                fire[0] = false;
+                                if wrap(aim[0] - me.aim[0]).abs() < 0.04 && (aim[1] - me.aim[1]).abs() < 0.04 {
                                     fire[1] = true;
                                 }
                             }
