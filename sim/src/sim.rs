@@ -200,7 +200,7 @@ pub struct Sim {
     pub over: bool,
     pub dying: Vec<(usize, Option<usize>)>,
     pub deaths_log: Vec<(u32, f64, usize, Option<usize>)>, // (id, t, place, killer)
-    pub dmg_log: Vec<(usize, Option<usize>, String, f64, bool)>, // (target, by, weapon, dmg, rear)
+    pub dmg_log: Vec<(usize, Option<usize>, String, f64, bool, f64)>, // (target, by, weapon, dmg, rear, t)
 }
 
 pub const EVENT_NONE: fn() -> Event = Event::default;

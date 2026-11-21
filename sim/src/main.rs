@@ -104,6 +104,7 @@ fn main() {
             "--field-brains" => o.field_brains = val().parse().unwrap_or_else(|_| usage()),
             "--arena-host" => o.arena_host = val(),
             "--field-n" => o.field_n = val().parse().unwrap_or_else(|_| usage()),
+            "--preset" => o.params = mech_bot::params::Params::preset(&val()),
             "--dump-params" => {
                 println!("{}", serde_json::to_string_pretty(&o.params).unwrap());
                 return;

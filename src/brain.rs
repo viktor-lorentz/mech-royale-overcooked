@@ -274,7 +274,7 @@ impl Brain {
                 "plating", "armor", "laser_charge", "nanites", "laser_damage", "gun_damage", "lightning_efficiency", "gun_rate",
                 "sensors", "gyros", "lightning_range", "servos", "gun_velocity", "gun_mag", "mortar_reload", "reactor",
             ];
-            let pref: &[&str] = if self.royale { &PREF_R } else { &PREF_G };
+            let pref: &[&str] = if self.royale || self.p.survival_upgrades { &PREF_R } else { &PREF_G };
             let mut best = 0usize;
             let mut best_rank = usize::MAX;
             for (i, c) in of.choices.iter().enumerate() {
@@ -318,7 +318,8 @@ impl Brain {
         self.seen_pickups.retain(|q| o.pickups.iter().any(|p| p.id == q.id) || dist2d(q.pos, pos) > 25.0);
         let seen_pickups = std::mem::take(&mut self.seen_pickups);
         let mut pick_target: Option<&Pickup> = None;
-        if enemies.is_empty() {
+        let loot_ok = enemies.first().map(|e| self.p.loot_enemy_r > 0.0 && dist(e.pos, pos) > self.p.loot_enemy_r).unwrap_or(true);
+        if loot_ok {
             let mut best = f64::MAX;
             for p in &seen_pickups {
                 if p.kind == "gun" || Self::weapon_pref(&p.kind) <= held_pref {
@@ -505,7 +506,7 @@ impl Brain {
         let outnumbered = self.p.outnumber_n > 0 && threats.iter().filter(|t| dist(**t, pos) < self.p.outnumber_r).count() >= self.p.outnumber_n;
         let hurt = (hp_frac < self.p.hurt_hp && !threats.is_empty()) || outnumbered;
         let mut hiding = false;
-        if hurt || (self.cover.is_some() && hp_frac < self.p.cover_exit_hp && o.t - self.cover_t < 8.0) {
+        if hurt || (self.cover.is_some() && hp_frac < self.p.cover_exit_hp && o.t - self.cover_t < self.p.cover_window) {
             if o.t - self.cover_t > 0.6 || self.cover.is_none() {
                 if !threats.is_empty() {
                     self.cover = self.find_cover(pos, &threats, &o.zone);
