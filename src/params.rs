@@ -108,7 +108,7 @@ impl Params {
             loot_enemy_r: 0.0,
             explore_until: 170.0,
             strafe_period: 1.2,
-            fire_tol: 1.6,
+            fire_tol: 1.3,
             laser_tol: 0.8,
             attacker_mem: 2.0,
             attacker_switch: 1.5,
