@@ -225,6 +225,7 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
             }
         }
     }
+    let mut held_t: std::collections::BTreeMap<String, f64> = Default::default();
     let mut lat = LatHist::new();
     let mut replay = if idx < o.replay_matches && o.replay_dir.is_some() { Some(String::new()) } else { None };
     if let Some(r) = replay.as_mut() {
@@ -248,6 +249,12 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
             break;
         }
         let obs = sim.build_all_obs();
+        for &s in &tracked_slots {
+            if sim.mechs[s].alive {
+                let k = sim.mechs[s].slots[1].as_ref().map(|w| crate::cfg::KIND_NAMES[w.kind]).unwrap_or("none");
+                *held_t.entry(k.to_string()).or_default() += cfg.dt * de as f64;
+            }
+        }
         let t = sim.t();
         // squad knowledge
         let mut focus = None;
@@ -350,6 +357,9 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
             }
             let kt: Vec<String> = sim.deaths_log.iter().filter(|d| d.3 == Some(s)).map(|d| format!("{:.0}", d.1)).collect();
             let dt = sim.deaths_log.iter().find(|d| d.0 as usize == s).map(|d| d.1).unwrap_or(-1.0);
+            for (k, v) in &held_t {
+                let _ = write!(line, "\theld_{k}={v:.0}");
+            }
             let _ = write!(line, "\tdeath={dt:.0}\tkills_at={}", kt.join(","));
             if dt > 0.0 && dt < 35.0 {
                 let mut g: std::collections::BTreeMap<String, f64> = Default::default();

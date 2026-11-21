@@ -41,6 +41,7 @@ pub struct Brain {
     infight: u32,
     npc_hit: Option<(f64, i64)>,
     mech_hit: Option<(f64, f64, i64)>, // (time, bearing, attacker id)
+    seen_pickups: Vec<Pickup>,
     infight_t: f64,
     pub royale: bool,
     pub p: Params,
@@ -103,6 +104,7 @@ impl Brain {
             infight: 0,
             npc_hit: None,
             mech_hit: None,
+            seen_pickups: Vec::new(),
             infight_t: -10.0,
             royale: false,
             p,
@@ -305,18 +307,31 @@ impl Brain {
         // loot
         let held_kind: Option<String> = me.weapons.get(1).and_then(|w| w.as_ref()).map(|w| w.kind.clone());
         let held_pref = held_kind.as_deref().map(Self::weapon_pref).unwrap_or(-1);
+        // weapons on the ground never despawn: remember every one we have seen, forget it when we are close and it is gone
+        for p in &o.pickups {
+            if let Some(q) = self.seen_pickups.iter_mut().find(|q| q.id == p.id) {
+                q.pos = p.pos;
+            } else {
+                self.seen_pickups.push(p.clone());
+            }
+        }
+        self.seen_pickups.retain(|q| o.pickups.iter().any(|p| p.id == q.id) || dist2d(q.pos, pos) > 25.0);
+        let seen_pickups = std::mem::take(&mut self.seen_pickups);
         let mut pick_target: Option<&Pickup> = None;
         if enemies.is_empty() {
             let mut best = f64::MAX;
-            for p in &o.pickups {
+            for p in &seen_pickups {
                 if p.kind == "gun" || Self::weapon_pref(&p.kind) <= held_pref {
                     continue;
                 }
                 if me.weapons.iter().flatten().any(|w| w.kind == p.kind) {
                     continue;
                 }
+                if (p.pos[0] - z.center[0]).hypot(p.pos[1] - z.center[1]) > z.radius - 10.0 {
+                    continue;
+                }
                 let d = dist2d(pos, p.pos);
-                let reach = if held_pref < 0 { 90.0 } else { 45.0 };
+                let reach = if held_pref < 0 { self.p.pickup_r_unarmed } else { self.p.pickup_r_armed };
                 let sc = d - 20.0 * Self::weapon_pref(&p.kind) as f64;
                 if sc < best && d < reach {
                     best = sc;
@@ -451,6 +466,7 @@ impl Brain {
         }
 
         // ---- combat
+        let crate_r = if held_pref < 0 { self.p.crate_r_unarmed } else { self.p.crate_r };
         let mut aim = me.aim;
         let mut fire = [false, false];
         let mut mv_override: Option<[f64; 2]> = None;
@@ -644,7 +660,7 @@ impl Brain {
             }
         } else if let (Some(hb), true) = (unseen_hit, self.p.face_unseen) {
             aim = [hb, 0.0];
-        } else if let Some(cr) = o.crates.iter().filter(|c| dist(c.pos, pos) < 60.0).min_by(|a, b| dist(a.pos, pos).partial_cmp(&dist(b.pos, pos)).unwrap()) {
+        } else if let Some(cr) = o.crates.iter().filter(|c| dist(c.pos, pos) < crate_r).min_by(|a, b| dist(a.pos, pos).partial_cmp(&dist(b.pos, pos)).unwrap()) {
             let tpos = [cr.pos[0], cr.pos[1], cr.pos[2] + 1.2];
             aim = [yaw_to(muzzle, tpos), pitch_to(muzzle, tpos)];
             if self.clear(muzzle, tpos) && wrap(aim[0] - me.aim[0]).abs() < 0.05 && (aim[1] - me.aim[1]).abs() < 0.06 {
@@ -670,7 +686,8 @@ impl Brain {
         let loot_free = pick_target.is_none() && drop_goal.is_none()
             && o.cubes.iter().all(|c| dist2d(pos, c.pos) >= 50.0)
             && drones.iter().all(|d| dist(d.pos, pos) >= 80.0)
-            && o.crates.iter().all(|c| dist(c.pos, pos) >= 60.0);
+            && o.crates.iter().all(|c| dist(c.pos, pos) >= crate_r);
+        self.seen_pickups = seen_pickups;
         if loot_free && target.is_none() && !hiding {
             if let Some(e) = self.explore {
                 want = Some(e);
@@ -681,7 +698,7 @@ impl Brain {
             if let Some(w) = want {
                 mv = self.steer(o.t, pos, w);
                 let facing_hit = self.hit_bearing.map(|(ht, _)| o.t - ht < 2.0).unwrap_or(false);
-                if target.is_none() && !facing_hit && o.crates.iter().all(|c| dist(c.pos, pos) >= 60.0) {
+                if target.is_none() && !facing_hit && o.crates.iter().all(|c| dist(c.pos, pos) >= crate_r) {
                     // sweep the torso while travelling: widens the 120-degree vision wedge
                     let heading = mv[1].atan2(mv[0]);
                     aim = [heading + 0.9 * (o.t * 1.6).sin(), 0.0];
