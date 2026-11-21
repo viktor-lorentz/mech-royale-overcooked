@@ -1,9 +1,5 @@
 //! Overcooked mech bot: mechfight/1 over stdin/stdout.
-mod brain;
-mod geom;
-mod protocol;
-
-use protocol::*;
+use mech_bot::{brain, protocol::*};
 use std::io::{BufRead, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::mpsc;

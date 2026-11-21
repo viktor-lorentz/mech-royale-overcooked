@@ -3,6 +3,10 @@ name = "mech-bot"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "mech_bot"
+path = "src/lib.rs"
+
 [[bin]]
 name = "mech-bot"
 path = "src/main.rs"
