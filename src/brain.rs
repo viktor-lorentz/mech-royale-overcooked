@@ -286,6 +286,59 @@ impl Brain {
             }
         }
 
+        // ---- supply drops: grab the free cubes + full repair when it is safe
+        let mut drop_goal: Option<[f64; 2]> = None;
+        if enemies.is_empty() && hp_frac_early(me) > 0.4 {
+            for d in &o.drops {
+                let dd = dist2d(pos, d.pos);
+                let mine = d.holder.map(|h| h == me.id).unwrap_or(true);
+                let eta = dd / 14.0;
+                if mine && dd < 150.0 && d.lands_in < eta + 14.0 {
+                    if drop_goal.map(|g| dd < dist2d(pos, [g[0], g[1], 0.0])).unwrap_or(true) {
+                        drop_goal = Some([d.pos[0], d.pos[1]]);
+                    }
+                }
+            }
+        }
+        if let Some(g) = drop_goal {
+            // inside the ring: stand still to capture
+            let in_ring = o.drops.iter().any(|d| dist2d(pos, d.pos) < d.radius - 2.0 && d.lands_in <= 0.0);
+            want = if in_ring { None } else { Some(g) };
+            if !in_ring && dist2d(pos, [g[0], g[1], 0.0]) > 20.0 {
+                boost = boost || me.energy > 60.0;
+            }
+        }
+        // ---- incoming mortar shells: step out of the predicted blast
+        let mut mortar_evade: Option<[f64; 2]> = None;
+        for pr in o.projectiles.iter().filter(|p| p.kind == "mortar") {
+            let (mut x, mut y, mut zz) = (pr.pos[0], pr.pos[1], pr.pos[2]);
+            let (vx, vy, mut vz) = (pr.vel[0], pr.vel[1], pr.vel[2]);
+            let mut t = 0.0;
+            let mut hit = None;
+            while t < 6.0 {
+                x += vx * 0.05;
+                y += vy * 0.05;
+                vz -= self.mortar_g * 0.05;
+                zz += vz * 0.05;
+                t += 0.05;
+                let gnd = self.world.as_ref().map(|w| w.ground(x, y)).unwrap_or(0.0);
+                if zz <= gnd {
+                    hit = Some([x, y, t]);
+                    break;
+                }
+            }
+            if let Some([ix, iy, tt]) = hit {
+                let dd = (ix - pos[0]).hypot(iy - pos[1]);
+                if dd < 11.0 && tt > 0.2 {
+                    let away = (pos[1] - iy).atan2(pos[0] - ix);
+                    mortar_evade = Some([away.cos(), away.sin()]);
+                }
+            }
+        }
+        if mortar_evade.is_some() {
+            boost = me.energy > 15.0;
+        }
+
         // ---- exploration bookkeeping: mark nearby cells as seen, pick the nearest unseen safe cell
         if self.sgw > 0 {
             let r = 44.0;
@@ -467,7 +520,7 @@ impl Brain {
         }
 
         // ---- movement
-        let loot_free = pick_target.is_none()
+        let loot_free = pick_target.is_none() && drop_goal.is_none()
             && o.cubes.iter().all(|c| dist2d(pos, c.pos) >= 50.0)
             && drones.iter().all(|d| dist(d.pos, pos) >= 80.0)
             && o.crates.iter().all(|c| dist(c.pos, pos) >= 60.0);
@@ -487,6 +540,10 @@ impl Brain {
                     aim = [heading + 0.9 * (o.t * 1.6).sin(), 0.0];
                 }
             }
+        }
+
+        if let Some(m) = mortar_evade {
+            mv = m;
         }
 
         // ---- unstick
@@ -513,7 +570,9 @@ impl Brain {
         a.aim = Some(aim);
         a.fire = Some(fire);
         if let Some(g) = gun {
-            if g.ammo.unwrap_or(1.0) < 1.0 && g.reload.unwrap_or(0.0) <= 0.0 {
+            let mag = g.stats.get("mag").copied().unwrap_or(12.0);
+            let ammo = g.ammo.unwrap_or(mag);
+            if g.reload.unwrap_or(0.0) <= 0.0 && (ammo < 1.0 || (target.is_none() && ammo < mag * 0.6)) {
                 a.reload = Some(true);
             }
         }
