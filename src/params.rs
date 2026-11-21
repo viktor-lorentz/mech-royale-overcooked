@@ -78,7 +78,7 @@ impl Params {
             light_band: [20.0, 38.0],
             mortar_band: [60.0, 140.0],
             gun_band: [40.0, 90.0],
-            hurt_hp: 0.5,
+            hurt_hp: 0.3,
             cover_exit_hp: 0.8,
             threat_r: 160.0,
             outnumber_n: 0,
