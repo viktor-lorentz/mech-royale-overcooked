@@ -49,6 +49,7 @@ fn main() {
     };
     let mut threads = 0usize;
     let mut do_cal = false;
+    let mut verbose = false;
     let mut i = 0;
     let mut replay_set = false;
     while i < args.len() {
@@ -70,6 +71,7 @@ fn main() {
             "--threads" => threads = val().parse().unwrap_or_else(|_| usage()),
             "--player" => o.player = val(),
             "--full" => o.full = true,
+            "--verbose" | "-v" => verbose = true,
             "--replay-dir" => o.replay_dir = Some(val()),
             "--replay-matches" => {
                 o.replay_matches = val().parse().unwrap_or_else(|_| usage());
@@ -126,6 +128,14 @@ fn main() {
         }
     }
 
+    if verbose {
+        for r in &results {
+            println!("match {} dur={:.0}s tracked={:?}", r.idx, r.duration, r.tracked.iter().map(|t| (t.slot, t.place, t.kills, t.survive_s as i64)).collect::<Vec<_>>());
+            for (id, t, place, killer) in &r.deaths {
+                println!("   t={:>6.1} #{:<2} {:<7} place {:<2} killed by {}", t, id, r.names[*id as usize], place, killer.map_or("zone/none".to_string(), |k| format!("#{} {}", k, r.names[k])));
+            }
+        }
+    }
     // aggregate
     let mut scores = vec![];
     let mut kills = vec![];

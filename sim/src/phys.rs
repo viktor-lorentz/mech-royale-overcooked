@@ -185,6 +185,15 @@ impl Sim {
         }
         m.pos[0] = nx;
         m.pos[1] = ny;
+        // follow the ground to the new position
+        if m.grounded {
+            let sf = world.support(nx, ny, m.pos[2], b.step_up);
+            if sf >= m.pos[2] - b.step_up - 1e-6 {
+                m.pos[2] = sf;
+            } else {
+                m.grounded = false;
+            }
+        }
         // vertical move
         if !m.grounded {
             let feet_old = m.pos[2];

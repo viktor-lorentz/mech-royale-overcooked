@@ -98,6 +98,8 @@ pub struct MatchResult {
     pub lat: LatHist,
     pub replay: Option<String>,
     pub ticks: u64,
+    pub names: Vec<String>,
+    pub deaths: Vec<(u32, f64, usize, Option<usize>)>,
 }
 
 fn weighted_pick(rng: &mut Rng, pool: &[(String, f64)]) -> String {
@@ -277,7 +279,7 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
         }
         let _ = writeln!(r, "{{\"k\":\"end\",\"t\":{:.2},\"places\":{:?}}}", t_end, sim.mechs.iter().map(|m| m.place).collect::<Vec<_>>());
     }
-    MatchResult { idx, tracked, duration: t_end, lat, replay, ticks: sim.tick }
+    MatchResult { idx, tracked, duration: t_end, lat, replay, ticks: sim.tick, names, deaths: sim.deaths_log.clone() }
 }
 
 fn frame(r: &mut String, sim: &Sim) {

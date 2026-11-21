@@ -552,6 +552,19 @@ impl Sim {
         let st = self.mechs[i].wstats[w.kind].clone();
         let g = |k: &str| st.get(k).copied().unwrap_or(0.0);
         let mult = self.dmg_mult(i);
+        // timers run down first, then the trigger is evaluated (matches the recorded cooldown readings)
+        if w.cooldown > 0.0 {
+            w.cooldown -= dt; // may dip just below 0: the remainder carries into the next shot (exact fire rate)
+        } else {
+            w.cooldown = 0.0;
+        }
+        if w.reload > 0.0 {
+            w.reload -= dt;
+            if w.reload <= 1e-9 {
+                w.reload = 0.0;
+                w.ammo = st.get("mag").copied().unwrap_or(12.0);
+            }
+        }
         match w.kind {
             GUN => {
                 if fire && w.cooldown <= 1e-9 && w.reload <= 0.0 && w.ammo >= 1.0 {
@@ -585,14 +598,6 @@ impl Sim {
                     if w.ammo < 1.0 {
                         w.reload = g("reload");
                         self.emit_sound("reload", p, i as i64);
-                    }
-                }
-                w.cooldown = (w.cooldown - dt).max(-dt);
-                if w.reload > 0.0 {
-                    w.reload -= dt;
-                    if w.reload <= 1e-9 {
-                        w.reload = 0.0;
-                        w.ammo = g("mag");
                     }
                 }
             }
@@ -635,7 +640,6 @@ impl Sim {
                     }
                     w.cooldown += g("cooldown");
                 }
-                w.cooldown = (w.cooldown - dt).max(-dt);
             }
             LASER => {
                 let ct = g("charge");
@@ -662,8 +666,6 @@ impl Sim {
                         w.charge = 0.0;
                         w.cooldown = g("cooldown");
                     }
-                } else {
-                    w.cooldown = (w.cooldown - dt).max(-dt);
                 }
             }
             LIGHTNING => {
@@ -673,7 +675,6 @@ impl Sim {
                     self.fire_lightning(i, &st, mult);
                     w.cooldown += g("cooldown");
                 }
-                w.cooldown = (w.cooldown - dt).max(-dt);
             }
             _ => {}
         }
