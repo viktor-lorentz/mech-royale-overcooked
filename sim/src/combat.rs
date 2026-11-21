@@ -597,6 +597,7 @@ impl Sim {
                     w.ammo -= 1.0;
                     w.cooldown += g("cooldown");
                     let p = self.mechs[i].pos;
+                    self.shots.push((i, 0));
                     self.emit_sound("gun", p, i as i64);
                     if w.ammo < 1.0 {
                         w.reload = g("reload");

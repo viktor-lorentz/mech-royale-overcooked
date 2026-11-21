@@ -7,6 +7,7 @@ bee18d0	-	-	-	yes	2.40	BB-A74ABB1C	-	v1 nav A*, LOS-gated fire
 938ab34	2.266	8.726	6.629	yes	2.81	BB-81F5838C	7.94(n=16,se1.1)	same bot as 0739ab3 (+Params refactor); field = 10 real public bots + 5 expert per match
 90e4970	2.547	8.987	7.040	yes	3.04	BB-058E9BC4	-	drone awareness + face/target attackers + infight detector; train base 6.472
 51b6005	2.536	9.091	7.082	no	-	-	-	pickup memory etc; val no gain vs 90e4970 (2.547)
-96a986a	-	-	-	yes	-	BB-38F51286	-	VARIANT A survivor
-9a0a40b	2.490(val)	-	-	pending	-	-	-	VARIANT B controlled (sim surv 95s)
-0bdf825	2.422(val)	-	-	pending	-	-	-	VARIANT C heal
+96a986a	2.484(val)	-	-	yes	2.50	BB-38F51286	-	VARIANT A survivor
+9a0a40b	2.490(val)	-	-	yes	2.40	BB-EDD1F2BA	-	VARIANT B controlled (sim surv 95s)
+0bdf825	2.422(val)	-	-	yes	-	BB-255CB5DD	-	VARIANT C heal
+next	2.655(val sq768)	-	-	pending	-	-	-	base(pickup mem)+fire_tol 1.3 (val base 2.585)

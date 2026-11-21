@@ -111,11 +111,11 @@ impl Brain {
         }
     }
 
-    fn weapon_pref(kind: &str) -> i32 {
+    fn weapon_pref(&self, kind: &str) -> i32 {
         match kind {
-            "laser" => 3,
-            "lightning" => 2,
-            "mortar" => 1,
+            "laser" => self.p.pref[0],
+            "lightning" => self.p.pref[1],
+            "mortar" => self.p.pref[2],
             _ => 0,
         }
     }
@@ -306,7 +306,7 @@ impl Brain {
 
         // loot
         let held_kind: Option<String> = me.weapons.get(1).and_then(|w| w.as_ref()).map(|w| w.kind.clone());
-        let held_pref = held_kind.as_deref().map(Self::weapon_pref).unwrap_or(-1);
+        let held_pref = held_kind.as_deref().map(|k| self.weapon_pref(k)).unwrap_or(-1);
         // weapons on the ground never despawn: remember every one we have seen, forget it when we are close and it is gone
         for p in &o.pickups {
             if let Some(q) = self.seen_pickups.iter_mut().find(|q| q.id == p.id) {
@@ -322,7 +322,7 @@ impl Brain {
         if loot_ok {
             let mut best = f64::MAX;
             for p in &seen_pickups {
-                if p.kind == "gun" || Self::weapon_pref(&p.kind) <= held_pref {
+                if p.kind == "gun" || self.weapon_pref(&p.kind) <= held_pref {
                     continue;
                 }
                 if me.weapons.iter().flatten().any(|w| w.kind == p.kind) {
@@ -333,7 +333,7 @@ impl Brain {
                 }
                 let d = dist2d(pos, p.pos);
                 let reach = if held_pref < 0 { self.p.pickup_r_unarmed } else { self.p.pickup_r_armed };
-                let sc = d - 20.0 * Self::weapon_pref(&p.kind) as f64;
+                let sc = d - 20.0 * self.weapon_pref(&p.kind) as f64;
                 if sc < best && d < reach {
                     best = sc;
                     pick_target = Some(p);

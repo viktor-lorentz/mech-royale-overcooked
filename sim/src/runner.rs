@@ -360,6 +360,7 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
             for (k, v) in &held_t {
                 let _ = write!(line, "\theld_{k}={v:.0}");
             }
+            let _ = write!(line, "\tgun_shots={}", sim.shots.iter().filter(|x| x.0 == s).count());
             let _ = write!(line, "\tdeath={dt:.0}\tkills_at={}", kt.join(","));
             if dt > 0.0 && dt < 35.0 {
                 let mut g: std::collections::BTreeMap<String, f64> = Default::default();

@@ -200,6 +200,7 @@ pub struct Sim {
     pub over: bool,
     pub dying: Vec<(usize, Option<usize>)>,
     pub deaths_log: Vec<(u32, f64, usize, Option<usize>)>, // (id, t, place, killer)
+    pub shots: Vec<(usize, usize)>, // (shooter, weapon kind) per shot
     pub dmg_log: Vec<(usize, Option<usize>, String, f64, bool, f64)>, // (target, by, weapon, dmg, rear, t)
 }
 
@@ -246,6 +247,7 @@ impl Sim {
             dying: vec![],
             deaths_log: vec![],
             dmg_log: vec![],
+            shots: vec![],
         };
         // mechs
         let mut spawns: Vec<[f64; 2]> = vec![];

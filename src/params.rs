@@ -40,11 +40,12 @@ pub struct Params {
     pub attacker_switch: f64,
     pub face_unseen: bool,
     pub survival_upgrades: bool,
+    pub pref: [i32; 3], // laser, lightning, mortar
     pub cover_window: f64,
 }
 
 /// Which strategy preset ships. Each submitted variant is a commit that changes only this line.
-pub const VARIANT: &str = "heal";
+pub const VARIANT: &str = "base";
 
 impl Default for Params {
     fn default() -> Self {
@@ -99,11 +100,12 @@ impl Params {
             loot_enemy_r: 0.0,
             explore_until: 170.0,
             strafe_period: 1.2,
-            fire_tol: 0.9,
+            fire_tol: 1.3,
             attacker_mem: 2.0,
             attacker_switch: 1.5,
             face_unseen: true,
             survival_upgrades: false,
+            pref: [3, 2, 1],
             cover_window: 8.0,
         }
     }
