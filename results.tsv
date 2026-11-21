@@ -1,0 +1,6 @@
+commit	local_squad	local_ffa	composite	submitted	server_score	receipt	notes
+0b062a7	-	-	-	yes	2.31	BB-E8387585	v0 baseline Rust bot
+bee18d0	-	-	-	yes	2.40	BB-A74ABB1C	v1 nav A*, LOS-gated fire
+60e44bc	1.865	8.584	6.157	yes	2.52	BB-BA68ADC7	v2 cover heal, laser dodge, weapon swap
+63cc2e7	-	-	-	yes	2.52	BB-E1C44CFC	v3 exploration, drones, aim sweep
+4885ccf+	2.266	8.726	6.629	no	-	-	HEAD: laser hitscan fix, ranges, drops, mortar evade, royale, sound facing, A* cap (val)

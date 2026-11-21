@@ -152,7 +152,7 @@ impl Brain {
         let Some(nav) = &self.nav else { return straight };
         let moved = (goal[0] - self.path_goal[0]).hypot(goal[1] - self.path_goal[1]);
         if self.path.is_empty() || moved > 12.0 || t - self.path_t > 2.5 {
-            if let Some(p) = nav.path(pos, goal, 40000) {
+            if let Some(p) = nav.path(pos, goal, 12000) {
                 self.path = p;
                 self.path_goal = goal;
                 self.path_t = t;
@@ -199,7 +199,7 @@ impl Brain {
         if self.last_alive > 0 && o.alive < self.last_alive {
             let died = self.last_alive - o.alive;
             self.others_dead += died.saturating_sub(my_kills_now);
-            if self.others_dead >= 2 && !self.royale {
+            if self.others_dead >= 3 && !self.royale {
                 self.royale = true;
                 eprintln!("ROYALE mode at t={:.1} alive={}", o.t, o.alive);
             }

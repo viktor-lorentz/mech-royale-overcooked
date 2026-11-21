@@ -162,6 +162,7 @@ impl Nav {
         open.push(Node { f: hfn(s), i: s });
         let mut exp = 0;
         let mut found = false;
+        let mut visited: Vec<usize> = vec![s];
         while let Some(Node { i, .. }) = open.pop() {
             if i == g {
                 found = true;
@@ -194,6 +195,9 @@ impl Nav {
                     let step = if di != 0 && dj != 0 { 1.414 * CELL } else { CELL };
                     let cost = gs[i] + step + if self.near[nc] { 2.5 } else { 0.0 };
                     if cost < gs[nc] {
+                        if gs[nc] == f64::MAX {
+                            visited.push(nc);
+                        }
                         gs[nc] = cost;
                         came[nc] = i;
                         open.push(Node { f: cost + hfn(nc), i: nc });
@@ -207,8 +211,8 @@ impl Nav {
             // partial: best explored cell closest to goal
             let mut best = s;
             let mut bd = f64::MAX;
-            for c in 0..n {
-                if gs[c] < f64::MAX {
+            for &c in &visited {
+                {
                     let d = hfn(c);
                     if d < bd {
                         bd = d;
