@@ -200,6 +200,7 @@ pub struct Sim {
     pub over: bool,
     pub dying: Vec<(usize, Option<usize>)>,
     pub deaths_log: Vec<(u32, f64, usize, Option<usize>)>, // (id, t, place, killer)
+    pub dmg_log: Vec<(usize, Option<usize>, String, f64, bool)>, // (target, by, weapon, dmg, rear)
 }
 
 pub const EVENT_NONE: fn() -> Event = Event::default;
@@ -244,6 +245,7 @@ impl Sim {
             over: false,
             dying: vec![],
             deaths_log: vec![],
+            dmg_log: vec![],
         };
         // mechs
         let mut spawns: Vec<[f64; 2]> = vec![];

@@ -328,6 +328,42 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
             b.end(1, 0);
         }
     }
+    if std::env::var("SIM_STATS").is_ok() {
+        for &s in &tracked_slots {
+            let mut line = String::from("STAT");
+            for (tag, mine) in [("dealt", true), ("taken", false)] {
+                let mut by_w: std::collections::BTreeMap<String, f64> = Default::default();
+                let mut rear = 0.0;
+                for (t, by, w, d, r) in &sim.dmg_log {
+                    let hit = if mine { *by == Some(s) && *t != s } else { *t == s };
+                    if hit {
+                        *by_w.entry(w.clone()).or_default() += d;
+                        if *r {
+                            rear += d;
+                        }
+                    }
+                }
+                for (w, d) in by_w {
+                    let _ = write!(line, "\t{tag}_{w}={d:.0}");
+                }
+                let _ = write!(line, "\t{tag}_rear={rear:.0}");
+            }
+            let kt: Vec<String> = sim.deaths_log.iter().filter(|d| d.3 == Some(s)).map(|d| format!("{:.0}", d.1)).collect();
+            let dt = sim.deaths_log.iter().find(|d| d.0 as usize == s).map(|d| d.1).unwrap_or(-1.0);
+            let _ = write!(line, "\tdeath={dt:.0}\tkills_at={}", kt.join(","));
+            if dt > 0.0 && dt < 35.0 {
+                let mut g: std::collections::BTreeMap<String, f64> = Default::default();
+                for (t, by, w, d, _) in &sim.dmg_log {
+                    if *t == s {
+                        let who = by.map(|b| if b < names.len() { names[b].clone() } else { "npc".into() }).unwrap_or("npc".into());
+                        *g.entry(format!("{who}/{w}")).or_default() += d;
+                    }
+                }
+                let _ = write!(line, "\tEARLY {:?}", g.iter().map(|(k, v)| format!("{k}:{v:.0}")).collect::<Vec<_>>());
+            }
+            eprintln!("{line}");
+        }
+    }
     let t_end = sim.t();
     let mut tracked = vec![];
     for &s in &tracked_slots {

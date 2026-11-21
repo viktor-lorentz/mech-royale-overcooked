@@ -38,6 +38,10 @@ pub struct Brain {
     explore_t: f64,
     last_alive: u32,
     others_dead: u32,
+    infight: u32,
+    npc_hit: Option<(f64, i64)>,
+    mech_hit: Option<(f64, f64, i64)>, // (time, bearing, attacker id)
+    infight_t: f64,
     pub royale: bool,
     pub p: Params,
 }
@@ -96,6 +100,10 @@ impl Brain {
             explore_t: -10.0,
             last_alive: 0,
             others_dead: 0,
+            infight: 0,
+            npc_hit: None,
+            mech_hit: None,
+            infight_t: -10.0,
             royale: false,
             p,
         }
@@ -212,13 +220,43 @@ impl Brain {
             }
         }
         self.last_alive = o.alive;
+        // beams that end on another mech (not us, not the shooter): mechs fighting each other = free-for-all
+        if self.p.infight_n > 0 && !self.royale {
+            for b in &o.beams {
+                if b.by == self.slot as i64 || b.path.len() < 2 {
+                    continue;
+                }
+                let end = b.path[b.path.len() - 1];
+                if dist2d(end, pos) < 12.0 {
+                    continue;
+                }
+                let hit_other = o.mechs.iter().any(|m| m.id != b.by && m.id != self.slot as i64 && dist2d(m.pos, end) < 4.0);
+                if hit_other && o.t - self.infight_t > 0.5 {
+                    self.infight += 1;
+                    self.infight_t = o.t;
+                    if self.infight >= self.p.infight_n {
+                        self.royale = true;
+                        eprintln!("ROYALE mode (infight) at t={:.1} alive={}", o.t, o.alive);
+                    }
+                }
+            }
+        }
 
         // ---- events
         for e in &o.events {
             if e.t == "damaged" {
                 if let (Some(b), Some(w)) = (e.bearing, e.weapon.as_deref()) {
-                    if w != "zone" {
+                    if w == "npc" {
+                        if let Some(by) = e.by {
+                            self.npc_hit = Some((o.t, by));
+                        }
+                    } else if w != "zone" {
                         self.hit_bearing = Some((o.t, b));
+                        if let Some(by) = e.by {
+                            if by < 100 {
+                                self.mech_hit = Some((o.t, b, by));
+                            }
+                        }
                     }
                 }
             }
@@ -422,6 +460,7 @@ impl Brain {
         let gun_range = gun.and_then(|g| g.stats.get("range")).copied().unwrap_or(230.0);
         let mut engaged = false;
         let royale = self.royale;
+        let attacker = self.mech_hit.filter(|(t, _, _)| o.t - *t < self.p.attacker_mem).and_then(|(_, _, id)| enemies.iter().copied().find(|m| m.id == id));
         let target = (if royale {
             enemies.iter().copied().min_by(|a, b| {
                 let sc = |m: &Actor| dist(m.pos, pos) + self.p.royale_hp_w * (m.hp.unwrap_or(1400.0) / m.max_hp.unwrap_or(1400.0).max(1.0));
@@ -430,8 +469,14 @@ impl Brain {
         } else {
             enemies.first().copied()
         })
+        .map(|t| match attacker {
+            Some(at) if at.id != t.id && dist(at.pos, pos) < dist(t.pos, pos) * self.p.attacker_switch => at,
+            _ => t,
+        })
         .or_else(|| {
-            drones.iter().copied().filter(|d| dist(d.pos, pos) < 35.0).min_by(|a, b| dist(a.pos, pos).partial_cmp(&dist(b.pos, pos)).unwrap())
+            // a drone that is shooting us comes first, then any drone close enough to shoot us anyway
+            let shooter = self.npc_hit.filter(|(t, _)| o.t - *t < 3.0).and_then(|(_, id)| drones.iter().copied().find(|d| d.id == id));
+            shooter.or_else(|| drones.iter().copied().filter(|d| dist(d.pos, pos) < self.p.drone_target_r).min_by(|a, b| dist(a.pos, pos).partial_cmp(&dist(b.pos, pos)).unwrap()))
         });
         let hp_frac = me.hp / me.max_hp.max(1.0);
         // ---- heal-cycle: when hurt with threats around, break line of sight and regenerate
@@ -459,6 +504,8 @@ impl Brain {
         } else {
             self.cover = None;
         }
+        let unseen_hit = self.mech_hit.filter(|(t, _, id)| o.t - *t < 1.5 && !enemies.iter().any(|m| m.id == *id)).map(|(_, b, _)| b);
+        let target = if unseen_hit.is_some() && self.p.face_unseen && target.map(|t| t.kind != "mech").unwrap_or(false) { None } else { target };
         if let Some(t) = target {
             let tpos = [t.pos[0], t.pos[1], t.pos[2] + 4.5];
             let d = dist(muzzle, tpos);
@@ -561,6 +608,14 @@ impl Brain {
                         m = [perp.cos() + radial * toward.cos(), perp.sin() + radial * toward.sin()];
                     }
                 }
+                // stay out of drone range while dueling a mech (each drone adds 25 dps)
+                if self.p.drone_avoid > 0.0 {
+                    for dr in drones.iter().filter(|d| dist2d(d.pos, pos) < 50.0) {
+                        let away = yaw_to(dr.pos, pos);
+                        m[0] += self.p.drone_avoid * away.cos();
+                        m[1] += self.p.drone_avoid * away.sin();
+                    }
+                }
                 mv_override = Some(m);
                 if low {
                     boost = true;
@@ -582,6 +637,8 @@ impl Brain {
                     mv_override = None; // let steering take us to cover; keep shooting if LOS allows
                 }
             }
+        } else if let (Some(hb), true) = (unseen_hit, self.p.face_unseen) {
+            aim = [hb, 0.0];
         } else if let Some(cr) = o.crates.iter().filter(|c| dist(c.pos, pos) < 60.0).min_by(|a, b| dist(a.pos, pos).partial_cmp(&dist(b.pos, pos)).unwrap()) {
             let tpos = [cr.pos[0], cr.pos[1], cr.pos[2] + 1.2];
             aim = [yaw_to(muzzle, tpos), pitch_to(muzzle, tpos)];

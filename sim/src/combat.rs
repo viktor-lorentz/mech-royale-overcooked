@@ -346,6 +346,8 @@ impl Sim {
         let full = d;
         m.hp -= full;
         m.last_dmg_t = now;
+        self.dmg_log.push((t, by, weapon.to_string(), full, rear));
+        let m = &mut self.mechs[t];
         let bearing = (src[1] - m.pos[1]).atan2(src[0] - m.pos[0]);
         let mut e = Self::ev("damaged");
         e.amount = Some(full);
@@ -367,6 +369,7 @@ impl Sim {
 
     pub fn zone_damage(&mut self, t: usize, amount: f64) {
         let now = self.t();
+        self.dmg_log.push((t, None, "zone".into(), amount, false));
         let m = &mut self.mechs[t];
         m.hp -= amount;
         m.last_dmg_t = now;

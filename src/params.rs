@@ -21,12 +21,18 @@ pub struct Params {
     pub royale_hp_w: f64,
     pub royale_hold_tfrac: f64,
     pub royale_deaths: u32,
+    pub infight_n: u32, // 0 = off
     pub drone_r: f64,
     pub drone_hp: f64,
+    pub drone_target_r: f64,
+    pub drone_avoid: f64,
     pub cube_r: f64,
     pub explore_until: f64,
     pub strafe_period: f64,
     pub fire_tol: f64,
+    pub attacker_mem: f64,
+    pub attacker_switch: f64,
+    pub face_unseen: bool,
 }
 
 impl Default for Params {
@@ -49,12 +55,18 @@ impl Default for Params {
             royale_hp_w: 160.0,
             royale_hold_tfrac: 0.5,
             royale_deaths: 3,
+            infight_n: 2,
             drone_r: 80.0,
             drone_hp: 0.5,
+            drone_target_r: 48.0,
+            drone_avoid: 0.8,
             cube_r: 50.0,
             explore_until: 170.0,
             strafe_period: 1.2,
             fire_tol: 0.9,
+            attacker_mem: 2.0,
+            attacker_switch: 1.5,
+            face_unseen: true,
         }
     }
 }
