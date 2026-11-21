@@ -11,13 +11,13 @@ pub struct Tag {
     pub t: String,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct HelloMap {
     #[serde(default)]
     pub dir: String,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct Hello {
     #[serde(default)]
     pub slot: u32,
@@ -29,23 +29,23 @@ pub struct Hello {
     pub config: Value,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct WeaponObs {
     #[serde(default)]
     pub kind: String,
     #[serde(default)]
     pub cooldown: f64,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ammo: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reload: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub charge: Option<f64>,
     #[serde(default)]
     pub stats: HashMap<String, f64>,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct SelfObs {
     #[serde(default)]
     pub id: i64,
@@ -77,7 +77,7 @@ pub struct SelfObs {
     pub stats: HashMap<String, f64>,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct Actor {
     #[serde(default)]
     pub id: i64,
@@ -89,11 +89,11 @@ pub struct Actor {
     pub vel: V3,
     #[serde(default)]
     pub aim: [f64; 2],
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hp: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_hp: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cubes: Option<f64>,
     #[serde(default)]
     pub weapons: Vec<String>,
@@ -101,7 +101,7 @@ pub struct Actor {
     pub charging: bool,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct Projectile {
     #[serde(default)]
     pub id: i64,
@@ -113,17 +113,17 @@ pub struct Projectile {
     pub vel: V3,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct Item {
     #[serde(default)]
     pub id: i64,
     #[serde(default)]
     pub pos: V3,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hp: Option<f64>,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct Pickup {
     #[serde(default)]
     pub id: i64,
@@ -133,7 +133,7 @@ pub struct Pickup {
     pub pos: V3,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct Sound {
     #[serde(default)]
     pub kind: String,
@@ -145,7 +145,7 @@ pub struct Sound {
     pub age: f64,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct Beam {
     #[serde(default)]
     pub by: i64,
@@ -157,33 +157,33 @@ pub struct Beam {
     pub age: f64,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct Event {
     #[serde(rename = "type", default)]
     pub t: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amount: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub weapon: Option<String>,
     #[serde(default)]
     pub bearing: Option<f64>,
     #[serde(default)]
     pub by: Option<i64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rear: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<i64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effect: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cubes: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<Value>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct Zone {
     #[serde(default)]
     pub center: [f64; 2],
@@ -201,19 +201,19 @@ pub struct Zone {
     pub dps: f64,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct OfferChoice {
     #[serde(default)]
     pub id: String,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct Offer {
     #[serde(default)]
     pub choices: Vec<OfferChoice>,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct SupplyDrop {
     #[serde(default)]
     pub id: i64,
@@ -231,7 +231,7 @@ pub struct SupplyDrop {
     pub holder: Option<i64>,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct Obs {
     #[serde(default)]
     pub tick: u64,
@@ -265,7 +265,7 @@ pub struct Obs {
     pub drops: Vec<SupplyDrop>,
 }
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct End {
     #[serde(default)]
     pub place: f64,

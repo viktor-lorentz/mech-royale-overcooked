@@ -1,5 +1,6 @@
 //! Running whole matches: compositions, controllers, lockstep loop, results, replay dump.
 use crate::cfg::Cfg;
+use crate::ext::{docker_cmd, ExtBot};
 use crate::house::*;
 use crate::map::World;
 use crate::rng::{mix, Rng};
@@ -15,6 +16,7 @@ use std::time::Instant;
 pub enum Mode {
     Squad,
     Ffa,
+    Field,
 }
 
 #[derive(Clone)]
@@ -29,11 +31,16 @@ pub struct Opts {
     pub hunt_fuzz: f64,
     pub player: String,
     pub ffa_pool: Vec<(String, f64)>,
+    pub field_images: Vec<String>,
+    pub field_brains: usize,
+    pub arena_host: String,
+    pub ext_budget_ms: u64,
 }
 
 pub enum Ctl {
     Brain(Box<Brain>),
     Fighter(Box<Fighter>, usize), // squad idx (usize::MAX = none)
+    Ext(Box<ExtBot>),
 }
 
 pub struct LatHist {
@@ -147,6 +154,29 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
             }
             squad = Some(Squad::new(members, player, o.hunt_fuzz, mseed ^ 0xABC));
         }
+        Mode::Field => {
+            // our brain(s) + distinct real opponents (docker images), filled with expert fighters if short
+            let mut imgs = o.field_images.clone();
+            for i in (1..imgs.len()).rev() {
+                let j = crng.below(i + 1);
+                imgs.swap(i, j);
+            }
+            let mut k = 0;
+            for s in 0..n {
+                names[s] = if s < o.field_brains.max(1) {
+                    "brain".into()
+                } else if k < imgs.len() {
+                    k += 1;
+                    format!("img:{}", imgs[k - 1])
+                } else {
+                    "expert".into()
+                };
+            }
+            for i in (1..n).rev() {
+                let j = crng.below(i + 1);
+                names.swap(i, j);
+            }
+        }
         Mode::Ffa => {
             for s in 0..n {
                 names[s] = if s == 0 { "brain".into() } else { weighted_pick(&mut crng, &o.ffa_pool) };
@@ -174,12 +204,25 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
                 config: cfg.raw["config"].clone(),
             };
             ctls.push(Ctl::Brain(Box::new(Brain::new(&h))));
+        } else if let Some(img) = names[s].strip_prefix("img:") {
+            match ExtBot::spawn(img, docker_cmd(img, &o.arena_host)) {
+                Some(b) => ctls.push(Ctl::Ext(Box::new(b))),
+                None => ctls.push(Ctl::Fighter(Box::new(Fighter::new(params_for("expert"), seed, world.clone())), usize::MAX)),
+            }
         } else {
             let sq_idx = squad.as_ref().and_then(|q| q.members.iter().position(|&m| m == s)).unwrap_or(usize::MAX);
             ctls.push(Ctl::Fighter(Box::new(Fighter::new(params_for(&names[s]), seed, world.clone())), sq_idx));
         }
     }
 
+    for s in 0..n {
+        let seed = mix(mseed, 1000 + s as u64);
+        if let Ctl::Ext(b) = &mut ctls[s] {
+            if !b.hello(s, seed, &cfg.raw["config"], std::time::Duration::from_secs(25)) {
+                eprintln!("ext bot {} failed hello; it will sit idle", b.name);
+            }
+        }
+    }
     let mut lat = LatHist::new();
     let mut replay = if idx < o.replay_matches && o.replay_dir.is_some() { Some(String::new()) } else { None };
     if let Some(r) = replay.as_mut() {
@@ -214,6 +257,12 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
             let k = q.n_active(t, alive_members.len());
             active = alive_members.into_iter().take(k).collect();
         }
+        let ext_deadline = Instant::now() + std::time::Duration::from_millis(o.ext_budget_ms);
+        for s in 0..n {
+            if let (Some(ob), Ctl::Ext(b)) = (&obs[s], &mut ctls[s]) {
+                b.send_obs(ob);
+            }
+        }
         for s in 0..n {
             actions[s] = None;
             let Some(ob) = &obs[s] else { continue };
@@ -238,6 +287,12 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
                     a.tick = ob.tick;
                     actions[s] = Some(a);
                 }
+                Ctl::Ext(_) => {}
+            }
+        }
+        for s in 0..n {
+            if let (Some(_), Ctl::Ext(b)) = (&obs[s], &mut ctls[s]) {
+                actions[s] = b.recv_action(ext_deadline);
             }
         }
         let mut takes = vec![];
@@ -263,6 +318,12 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
             if sim.over {
                 break;
             }
+        }
+    }
+    for s in 0..n {
+        if let Ctl::Ext(b) = &mut ctls[s] {
+            eprintln!("ext {} slot {} answered={} late={} alive_proc={} place={}", b.name, s, b.answered, b.late, b.alive, sim.mechs[s].alive);
+            b.end(1, 0);
         }
     }
     let t_end = sim.t();

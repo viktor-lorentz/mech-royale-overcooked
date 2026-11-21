@@ -2,6 +2,7 @@ mod calib;
 mod cfg;
 mod combat;
 mod ents;
+mod ext;
 mod house;
 mod map;
 mod obs;
@@ -46,6 +47,10 @@ fn main() {
         hunt_fuzz: 50.0,
         player: "brain".into(),
         ffa_pool: vec![("brain".into(), 3.0), ("hunter".into(), 8.0), ("camper".into(), 4.0)],
+        field_images: vec![],
+        field_brains: 1,
+        arena_host: String::new(),
+        ext_budget_ms: 60,
     };
     let mut threads = 0usize;
     let mut do_cal = false;
@@ -63,6 +68,7 @@ fn main() {
                 o.mode = match val().as_str() {
                     "squad" => Mode::Squad,
                     "ffa" => Mode::Ffa,
+                    "field" => Mode::Field,
                     _ => usage(),
                 }
             }
@@ -89,6 +95,13 @@ fn main() {
                     .collect()
             }
             "--calibrate" => do_cal = true,
+            "--field-images" => o.field_images = val().split(',').filter(|x| !x.is_empty()).map(String::from).collect(),
+            "--field-file" => {
+                o.field_images = std::fs::read_to_string(val()).unwrap_or_default().lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty() && !l.starts_with('#')).collect()
+            }
+            "--field-brains" => o.field_brains = val().parse().unwrap_or_else(|_| usage()),
+            "--arena-host" => o.arena_host = val(),
+            "--ext-budget-ms" => o.ext_budget_ms = val().parse().unwrap_or_else(|_| usage()),
             "-h" | "--help" => usage(),
             _ => usage(),
         }
