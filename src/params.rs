@@ -97,7 +97,7 @@ impl Params {
             drone_hp: 0.5,
             drone_target_r: 48.0,
             drone_avoid: 0.8,
-            second_avoid: 0.0,
+            second_avoid: 0.6,
             second_r: 150.0,
             cube_r: 50.0,
             cube_enemy_r: 0.0,
