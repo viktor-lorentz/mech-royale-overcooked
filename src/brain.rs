@@ -6,6 +6,8 @@ use crate::world::World;
 use serde_json::Value;
 use std::f64::consts::PI;
 
+const SEEN_CELL: f64 = 24.0;
+
 pub struct Brain {
     pub slot: u32,
     pickup_radius: f64,
@@ -26,6 +28,17 @@ pub struct Brain {
     hit_bearing: Option<(f64, f64)>, // (time, bearing)
     cover: Option<[f64; 2]>,
     cover_t: f64,
+    seen: Vec<f64>,
+    sgw: usize,
+    sgh: usize,
+    sx0: f64,
+    sy0: f64,
+    explore: Option<[f64; 2]>,
+    explore_t: f64,
+}
+
+fn hp_frac_early(me: &SelfObs) -> f64 {
+    me.hp / me.max_hp.max(1.0)
 }
 
 fn num(v: &Value, path: &[&str], d: f64) -> f64 {
@@ -41,6 +54,10 @@ impl Brain {
         let c = &h.config;
         let world = if h.map.dir.is_empty() { None } else { World::load(&h.map.dir) };
         let nav = world.as_ref().map(Nav::build);
+        let (sx0, sy0, sgw, sgh) = match &world {
+            Some(w) => (w.bounds[0], w.bounds[1], ((w.bounds[2] - w.bounds[0]) / SEEN_CELL).ceil() as usize + 1, ((w.bounds[3] - w.bounds[1]) / SEEN_CELL).ceil() as usize + 1),
+            None => (0.0, 0.0, 0, 0),
+        };
         Brain {
             slot: h.slot,
             pickup_radius: num(c, &["loot", "pickup_radius"], 4.0),
@@ -61,6 +78,13 @@ impl Brain {
             hit_bearing: None,
             cover: None,
             cover_t: -10.0,
+            seen: vec![-1.0; sgw * sgh],
+            sgw,
+            sgh,
+            sx0,
+            sy0,
+            explore: None,
+            explore_t: -10.0,
         }
     }
 
@@ -242,13 +266,67 @@ impl Brain {
             }
         } else if enemies.is_empty() {
             let mut best = f64::MAX;
+            let mut got_cube = false;
             for c in &o.cubes {
                 let d = dist2d(pos, c.pos);
                 if d < best && d < 50.0 {
                     best = d;
                     want = Some([c.pos[0], c.pos[1]]);
+                    got_cube = true;
                 }
             }
+            if !got_cube && hp_frac_early(me) > 0.5 {
+                if let Some(dr) = drones.iter().filter(|d| dist(d.pos, pos) < 80.0).min_by(|a, b| dist(a.pos, pos).partial_cmp(&dist(b.pos, pos)).unwrap()) {
+                    want = if dist2d(pos, dr.pos) > 30.0 { Some([dr.pos[0], dr.pos[1]]) } else { None };
+                } else if !o.crates.is_empty() {
+                    // crates handled in combat section
+                } else if o.t < 170.0 {
+                    // fall through to exploration below
+                }
+            }
+        }
+
+        // ---- exploration bookkeeping: mark nearby cells as seen, pick the nearest unseen safe cell
+        if self.sgw > 0 {
+            let r = 44.0;
+            let (i0, i1) = (((pos[0] - r - self.sx0) / SEEN_CELL).floor().max(0.0) as usize, (((pos[0] + r - self.sx0) / SEEN_CELL).floor().max(0.0) as usize).min(self.sgw - 1));
+            let (j0, j1) = (((pos[1] - r - self.sy0) / SEEN_CELL).floor().max(0.0) as usize, (((pos[1] + r - self.sy0) / SEEN_CELL).floor().max(0.0) as usize).min(self.sgh - 1));
+            for j in j0..=j1 {
+                for i in i0..=i1 {
+                    let (cx, cy) = (self.sx0 + (i as f64 + 0.5) * SEEN_CELL, self.sy0 + (j as f64 + 0.5) * SEEN_CELL);
+                    if (cx - pos[0]).hypot(cy - pos[1]) < r {
+                        self.seen[j * self.sgw + i] = o.t;
+                    }
+                }
+            }
+        }
+        let calm = enemies.is_empty() && hp_frac_early(me) > 0.6;
+        if calm && o.t < 170.0 && self.sgw > 0 && (self.explore.is_none() || o.t - self.explore_t > 1.5) {
+            self.explore_t = o.t;
+            let (sc, sr) = if o.t + 10.0 >= z.shrink_start { (z.next_center, z.next_radius) } else { (z.center, z.radius) };
+            let mut best: Option<([f64; 2], f64)> = None;
+            for j in 0..self.sgh {
+                for i in 0..self.sgw {
+                    if self.seen[j * self.sgw + i] >= 0.0 {
+                        continue;
+                    }
+                    let (cx, cy) = (self.sx0 + (i as f64 + 0.5) * SEEN_CELL, self.sy0 + (j as f64 + 0.5) * SEEN_CELL);
+                    if (cx - sc[0]).hypot(cy - sc[1]) > sr * 0.9 {
+                        continue;
+                    }
+                    if self.nav.as_ref().map(|n| n.is_blocked(cx, cy)).unwrap_or(false) {
+                        continue;
+                    }
+                    let d = (cx - pos[0]).hypot(cy - pos[1]);
+                    if d < 170.0 && best.map(|b| d < b.1).unwrap_or(true) {
+                        best = Some(([cx, cy], d));
+                    }
+                }
+            }
+            self.explore = best.map(|b| b.0);
+        }
+        if !calm {
+            self.explore = None;
         }
 
         // ---- combat
@@ -265,7 +343,7 @@ impl Brain {
         });
         let hp_frac = me.hp / me.max_hp.max(1.0);
         // ---- heal-cycle: when hurt with threats around, break line of sight and regenerate
-        let threats: Vec<V3> = enemies.iter().filter(|m| dist(m.pos, pos) < 160.0).map(|m| m.pos).collect();
+        let threats: Vec<V3> = enemies.iter().filter(|m| dist(m.pos, pos) < 160.0).take(4).map(|m| m.pos).collect();
         let hurt = hp_frac < 0.5 && !threats.is_empty();
         let mut hiding = false;
         if hurt || (self.cover.is_some() && hp_frac < 0.8 && o.t - self.cover_t < 8.0) {
@@ -389,12 +467,24 @@ impl Brain {
         }
 
         // ---- movement
+        let loot_free = pick_target.is_none()
+            && o.cubes.iter().all(|c| dist2d(pos, c.pos) >= 50.0)
+            && drones.iter().all(|d| dist(d.pos, pos) >= 80.0)
+            && o.crates.iter().all(|c| dist(c.pos, pos) >= 60.0);
+        if loot_free && target.is_none() && !hiding {
+            if let Some(e) = self.explore {
+                want = Some(e);
+            }
+        }
         let mut mv = mv_override.unwrap_or([0.0, 0.0]);
         if mv_override.is_none() {
             if let Some(w) = want {
                 mv = self.steer(o.t, pos, w);
-                if target.is_none() && !(self.hit_bearing.map(|(ht, _)| o.t - ht < 2.0).unwrap_or(false)) && o.crates.iter().all(|c| dist(c.pos, pos) >= 60.0) {
-                    aim = [mv[1].atan2(mv[0]), 0.0];
+                let facing_hit = self.hit_bearing.map(|(ht, _)| o.t - ht < 2.0).unwrap_or(false);
+                if target.is_none() && !facing_hit && o.crates.iter().all(|c| dist(c.pos, pos) >= 60.0) {
+                    // sweep the torso while travelling: widens the 120-degree vision wedge
+                    let heading = mv[1].atan2(mv[0]);
+                    aim = [heading + 0.9 * (o.t * 1.6).sin(), 0.0];
                 }
             }
         }
