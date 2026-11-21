@@ -8,9 +8,9 @@ Server best 3.04 (90e4970). Rank ~60/108; top-32 cut ~4.1 -> squad score is the 
 Sim diag (SIM_STATS=1): ~24% squad deaths <35s (2 mechs or drones); half alive time unarmed.
 
 ## NEXT ACTION (on resume)
-1. Read score of A (BB-38F51286, 96a986a). Submit B 9a0a40b then C 0bdf825 (one at a time; server queues one per team). Log in results.tsv.
-2. Keep server-best variant; iterate on it, 4 submits/hour, one hypothesis each. main HEAD = heal variant commit; set VARIANT to winner.
-Sim presets (val squad): base 2.536 surv82s | survivor 2.484 surv96s | controlled 2.490 surv95s | heal 2.422. Sim deaths: 65% have >=2 attackers in last 10s.
+Server: A survivor 2.50, B controlled 2.40, C heal 2.90 (all < 3.04 base 90e4970). Cautious play LOSES kills -> stay aggressive branch (VARIANT=base).
+Sim ranks matched server. fad65d9 (fire_tol 1.3) submitted BB-DD854E3C - read score.
+Probed no-effect: laser_tol, weapon pref (laser>lightning>mortar is best), loot_enemy_r.
 
 ## Next
 0. Unarmed-time: first weapon at ~35s. Path to nearest weapon at spawn? sweep torso more when unarmed.

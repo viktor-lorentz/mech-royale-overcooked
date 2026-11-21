@@ -552,7 +552,7 @@ impl Brain {
                         let ch = w.charge.unwrap_or(0.0);
                         let hp_pt = [tpos[0] + t.vel[0] * 0.1, tpos[1] + t.vel[1] * 0.1, tpos[2] + t.vel[2] * 0.1];
                         let la = [yaw_to(muzzle, hp_pt), pitch_to(muzzle, hp_pt)];
-                        let l_tol = (2.0 / d.max(5.0)).atan() * 0.8;
+                        let l_tol = (2.0 / d.max(5.0)).atan() * self.p.laser_tol;
                         let l_aligned = wrap(la[0] - me.aim[0]).abs() < l_tol && (la[1] - me.aim[1]).abs() < l_tol * 1.5;
                         if ch > 0.0 {
                             // charging: once full, keep holding until the beam would land, then let go

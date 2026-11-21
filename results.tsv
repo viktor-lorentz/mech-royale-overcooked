@@ -9,5 +9,5 @@ bee18d0	-	-	-	yes	2.40	BB-A74ABB1C	-	v1 nav A*, LOS-gated fire
 51b6005	2.536	9.091	7.082	no	-	-	-	pickup memory etc; val no gain vs 90e4970 (2.547)
 96a986a	2.484(val)	-	-	yes	2.50	BB-38F51286	-	VARIANT A survivor
 9a0a40b	2.490(val)	-	-	yes	2.40	BB-EDD1F2BA	-	VARIANT B controlled (sim surv 95s)
-0bdf825	2.422(val)	-	-	yes	-	BB-255CB5DD	-	VARIANT C heal
-next	2.655(val sq768)	-	-	pending	-	-	-	base(pickup mem)+fire_tol 1.3 (val base 2.585)
+0bdf825	2.422(val)	-	-	yes	2.90	BB-255CB5DD	-	VARIANT C heal
+fad65d9	2.655(val sq768)	-	-	yes	-	BB-DD854E3C	-	base(pickup mem)+fire_tol 1.3 (val base 2.585)
