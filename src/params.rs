@@ -44,7 +44,7 @@ pub struct Params {
 }
 
 /// Which strategy preset ships. Each submitted variant is a commit that changes only this line.
-pub const VARIANT: &str = "base";
+pub const VARIANT: &str = "survivor";
 
 impl Default for Params {
     fn default() -> Self {
