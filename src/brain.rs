@@ -1,6 +1,7 @@
 //! v1 brain: nav-aware looter/fighter that leads shots, checks line of sight and faces attackers.
 use crate::geom::*;
 use crate::nav::Nav;
+use crate::params::Params;
 use crate::protocol::*;
 use crate::world::World;
 use serde_json::Value;
@@ -38,6 +39,7 @@ pub struct Brain {
     last_alive: u32,
     others_dead: u32,
     pub royale: bool,
+    pub p: Params,
 }
 
 fn hp_frac_early(me: &SelfObs) -> f64 {
@@ -54,6 +56,10 @@ fn num(v: &Value, path: &[&str], d: f64) -> f64 {
 
 impl Brain {
     pub fn new(h: &Hello) -> Self {
+        Self::with_params(h, Params::default())
+    }
+
+    pub fn with_params(h: &Hello, p: Params) -> Self {
         let c = &h.config;
         let world = if h.map.dir.is_empty() { None } else { World::load(&h.map.dir) };
         let nav = world.as_ref().map(Nav::build);
@@ -91,6 +97,7 @@ impl Brain {
             last_alive: 0,
             others_dead: 0,
             royale: false,
+            p,
         }
     }
 
@@ -199,7 +206,7 @@ impl Brain {
         if self.last_alive > 0 && o.alive < self.last_alive {
             let died = self.last_alive - o.alive;
             self.others_dead += died.saturating_sub(my_kills_now);
-            if self.others_dead >= 3 && !self.royale {
+            if self.others_dead >= self.p.royale_deaths && !self.royale {
                 self.royale = true;
                 eprintln!("ROYALE mode at t={:.1} alive={}", o.t, o.alive);
             }
@@ -292,18 +299,18 @@ impl Brain {
             let mut got_cube = false;
             for c in &o.cubes {
                 let d = dist2d(pos, c.pos);
-                if d < best && d < 50.0 {
+                if d < best && d < self.p.cube_r {
                     best = d;
                     want = Some([c.pos[0], c.pos[1]]);
                     got_cube = true;
                 }
             }
-            if !got_cube && hp_frac_early(me) > 0.5 {
-                if let Some(dr) = drones.iter().filter(|d| dist(d.pos, pos) < 80.0).min_by(|a, b| dist(a.pos, pos).partial_cmp(&dist(b.pos, pos)).unwrap()) {
+            if !got_cube && hp_frac_early(me) > self.p.drone_hp {
+                if let Some(dr) = drones.iter().filter(|d| dist(d.pos, pos) < self.p.drone_r).min_by(|a, b| dist(a.pos, pos).partial_cmp(&dist(b.pos, pos)).unwrap()) {
                     want = if dist2d(pos, dr.pos) > 30.0 { Some([dr.pos[0], dr.pos[1]]) } else { None };
                 } else if !o.crates.is_empty() {
                     // crates handled in combat section
-                } else if o.t < 170.0 {
+                } else if o.t < self.p.explore_until {
                     // fall through to exploration below
                 }
             }
@@ -377,7 +384,7 @@ impl Brain {
             }
         }
         let calm = enemies.is_empty() && hp_frac_early(me) > 0.6;
-        if calm && o.t < 170.0 && self.sgw > 0 && (self.explore.is_none() || o.t - self.explore_t > 1.5) {
+        if calm && o.t < self.p.explore_until && self.sgw > 0 && (self.explore.is_none() || o.t - self.explore_t > 1.5) {
             self.explore_t = o.t;
             let (sc, sr) = if o.t + 10.0 >= z.shrink_start { (z.next_center, z.next_radius) } else { (z.center, z.radius) };
             let mut best: Option<([f64; 2], f64)> = None;
@@ -417,7 +424,7 @@ impl Brain {
         let royale = self.royale;
         let target = (if royale {
             enemies.iter().copied().min_by(|a, b| {
-                let sc = |m: &Actor| dist(m.pos, pos) + 160.0 * (m.hp.unwrap_or(1400.0) / m.max_hp.unwrap_or(1400.0).max(1.0));
+                let sc = |m: &Actor| dist(m.pos, pos) + self.p.royale_hp_w * (m.hp.unwrap_or(1400.0) / m.max_hp.unwrap_or(1400.0).max(1.0));
                 sc(a).partial_cmp(&sc(b)).unwrap()
             })
         } else {
@@ -428,10 +435,11 @@ impl Brain {
         });
         let hp_frac = me.hp / me.max_hp.max(1.0);
         // ---- heal-cycle: when hurt with threats around, break line of sight and regenerate
-        let threats: Vec<V3> = enemies.iter().filter(|m| dist(m.pos, pos) < 160.0).take(4).map(|m| m.pos).collect();
-        let hurt = hp_frac < 0.5 && !threats.is_empty();
+        let threats: Vec<V3> = enemies.iter().filter(|m| dist(m.pos, pos) < self.p.threat_r).take(4).map(|m| m.pos).collect();
+        let outnumbered = self.p.outnumber_n > 0 && threats.iter().filter(|t| dist(**t, pos) < self.p.outnumber_r).count() >= self.p.outnumber_n;
+        let hurt = (hp_frac < self.p.hurt_hp && !threats.is_empty()) || outnumbered;
         let mut hiding = false;
-        if hurt || (self.cover.is_some() && hp_frac < 0.8 && o.t - self.cover_t < 8.0) {
+        if hurt || (self.cover.is_some() && hp_frac < self.p.cover_exit_hp && o.t - self.cover_t < 8.0) {
             if o.t - self.cover_t > 0.6 || self.cover.is_none() {
                 if !threats.is_empty() {
                     self.cover = self.find_cover(pos, &threats, &o.zone);
@@ -460,7 +468,7 @@ impl Brain {
             aim = desired;
             let yaw_err = wrap(desired[0] - me.aim[0]).abs();
             let pit_err = (desired[1] - me.aim[1]).abs();
-            let tol = (2.0 / d.max(5.0)).atan() * 0.9;
+            let tol = (2.0 / d.max(5.0)).atan() * self.p.fire_tol;
             let aligned = yaw_err < tol && pit_err < tol * 1.5;
             engaged = t.kind == "mech" || d < 35.0;
             if aligned && d < gun_range && los {
@@ -519,27 +527,27 @@ impl Brain {
             if t.kind == "mech" {
                 if o.t > self.strafe_flip_at {
                     self.strafe_sign = -self.strafe_sign;
-                    self.strafe_flip_at = o.t + 1.2 + (o.tick % 7) as f64 * 0.15;
+                    self.strafe_flip_at = o.t + self.p.strafe_period + (o.tick % 7) as f64 * 0.15;
                 }
                 let toward = yaw_to(pos, t.pos);
-                let low = hp_frac < 0.3 && enemies.len() >= 1;
+                let low = hp_frac < self.p.low_hp && enemies.len() >= 1;
                 // preferred engagement band depends on what we carry (laser duels at range, lightning brawls)
                 let (near, far) = match w1.map(|w| w.kind.as_str()) {
-                    Some("laser") => (80.0, 150.0),
-                    Some("lightning") => (20.0, 38.0),
-                    Some("mortar") => (60.0, 140.0),
-                    _ => (40.0, 90.0),
+                    Some("laser") => (self.p.laser_band[0], self.p.laser_band[1]),
+                    Some("lightning") => (self.p.light_band[0], self.p.light_band[1]),
+                    Some("mortar") => (self.p.mortar_band[0], self.p.mortar_band[1]),
+                    _ => (self.p.gun_band[0], self.p.gun_band[1]),
                 };
                 let t_frac = t.hp.unwrap_or(1.0) / t.max_hp.unwrap_or(1400.0).max(1.0);
-                let finishing = t_frac < 0.35 && hp_frac > 0.5;
+                let finishing = t_frac < self.p.finish_tfrac && hp_frac > self.p.finish_hp;
                 let radial = if low {
                     -1.0
                 } else if finishing && d > 25.0 {
                     0.7
-                } else if d > far && !(royale && t_frac > 0.5) {
-                    0.6
+                } else if d > far && !(royale && t_frac > self.p.royale_hold_tfrac) {
+                    self.p.push_radial
                 } else if d < near {
-                    -0.8
+                    -self.p.retreat_radial
                 } else {
                     0.0
                 };

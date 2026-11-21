@@ -51,6 +51,7 @@ fn main() {
         field_brains: 1,
         arena_host: String::new(),
         ext_budget_ms: 60,
+        params: Default::default(),
     };
     let mut threads = 0usize;
     let mut do_cal = false;
@@ -101,6 +102,11 @@ fn main() {
             }
             "--field-brains" => o.field_brains = val().parse().unwrap_or_else(|_| usage()),
             "--arena-host" => o.arena_host = val(),
+            "--params" => {
+                let v = val();
+                let txt = if v.trim_start().starts_with('{') { v } else { std::fs::read_to_string(&v).unwrap_or_else(|_| usage()) };
+                o.params = serde_json::from_str(&txt).unwrap_or_else(|e| { eprintln!("bad params: {e}"); std::process::exit(2) });
+            }
             "--ext-budget-ms" => o.ext_budget_ms = val().parse().unwrap_or_else(|_| usage()),
             "-h" | "--help" => usage(),
             _ => usage(),

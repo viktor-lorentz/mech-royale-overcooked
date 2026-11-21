@@ -35,6 +35,7 @@ pub struct Opts {
     pub field_brains: usize,
     pub arena_host: String,
     pub ext_budget_ms: u64,
+    pub params: mech_bot::params::Params,
 }
 
 pub enum Ctl {
@@ -203,7 +204,7 @@ pub fn run_match(cfg: &Arc<Cfg>, world: &Arc<World>, o: &Opts, idx: usize) -> Ma
                 map: HelloMap { dir: o.map_dir.clone() },
                 config: cfg.raw["config"].clone(),
             };
-            ctls.push(Ctl::Brain(Box::new(Brain::new(&h))));
+            ctls.push(Ctl::Brain(Box::new(Brain::with_params(&h, o.params.clone()))));
         } else if let Some(img) = names[s].strip_prefix("img:") {
             match ExtBot::spawn(img, docker_cmd(img, &o.arena_host)) {
                 Some(b) => ctls.push(Ctl::Ext(Box::new(b))),
