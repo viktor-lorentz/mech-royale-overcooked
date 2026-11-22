@@ -702,7 +702,8 @@ impl Brain {
         }
 
         // ---- movement
-        let loot_free = pick_target.is_none() && drop_goal.is_none()
+        let going_for_pickup = pick_target.is_some();
+        let loot_free = !going_for_pickup && drop_goal.is_none()
             && o.cubes.iter().all(|c| dist2d(pos, c.pos) >= 50.0)
             && drones.iter().all(|d| dist(d.pos, pos) >= 80.0)
             && o.crates.iter().all(|c| dist(c.pos, pos) >= crate_r);
@@ -710,6 +711,24 @@ impl Brain {
         if loot_free && target.is_none() && !hiding {
             if let Some(e) = self.explore {
                 want = Some(e);
+            }
+        }
+        // Rooftops: the practice squad hunts on the ground. A roof inside the safe
+        // circle gives a line of sight they have to climb for, and a laser from up there
+        // is the fight worth taking. Hold the roof once we are on it.
+        let on_roof = self.world.as_ref().and_then(|w| w.roof_under(pos[0], pos[1])).map(|top| pos[2] > top - 1.8).unwrap_or(false);
+        let mut climb = false;
+        let enemy_close = enemies.first().map(|e| dist(e.pos, pos) < 32.0).unwrap_or(false);
+        if on_roof && me.in_zone && d_goal < gr * 0.92 && !going_for_pickup && drop_goal.is_none() && !hiding {
+            want = None;
+        } else if !on_roof && !enemy_close && !hiding && !going_for_pickup && drop_goal.is_none() {
+            if let Some(w) = &self.world {
+                if let Some((spot, top, bb)) = w.climb_roof(pos, gc, gr) {
+                    want = Some(spot);
+                    if World::dist_bb(bb, pos[0], pos[1]) < 7.0 && pos[2] < top - 1.2 && me.energy > 35.0 {
+                        climb = true;
+                    }
+                }
             }
         }
         let mut mv = mv_override.unwrap_or([0.0, 0.0]);
@@ -745,8 +764,24 @@ impl Brain {
             }
         }
 
-        if me.energy < 12.0 && me.in_zone {
+        if me.energy < 12.0 && me.in_zone && !climb {
             boost = false;
+        }
+        if climb {
+            a.jump = Some(true);
+            boost = true;
+        }
+        // Do not strafe off a roof we just climbed, unless the zone is leaving it.
+        if on_roof && me.in_zone && d_goal < gr * 0.9 {
+            if let Some(w) = &self.world {
+                let step = 5.0;
+                let nx = pos[0] + mv[0] * step;
+                let ny = pos[1] + mv[1] * step;
+                if w.roof_under(nx, ny).is_none() && w.roof_under(pos[0], pos[1]).is_some() {
+                    mv = [0.0, 0.0];
+                    boost = false;
+                }
+            }
         }
         a.mv = Some(mv);
         a.boost = Some(boost);

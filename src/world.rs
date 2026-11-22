@@ -116,6 +116,62 @@ impl World {
         })
     }
 
+    /// Highest building roof under (x, y), if the point sits on a climbable building.
+    pub fn roof_under(&self, x: f64, y: f64) -> Option<f64> {
+        let mut best: Option<f64> = None;
+        let Some(c) = self.cell(x, y) else { return None };
+        for &i in c {
+            let p = &self.prisms[i as usize];
+            if p.kind != 0 || p.top - p.base < 6.0 {
+                continue;
+            }
+            if x < p.bb[0] || x > p.bb[2] || y < p.bb[1] || y > p.bb[3] {
+                continue;
+            }
+            if in_poly(&p.ring, x, y) && !p.holes.iter().any(|h| in_poly(h, x, y)) {
+                best = Some(best.map(|b: f64| b.max(p.top)).unwrap_or(p.top));
+            }
+        }
+        best
+    }
+
+    /// A building roof inside the safe circle that is close enough to climb.
+    /// Returns (point on the roof, roof height, bbox).
+    pub fn climb_roof(&self, pos: V3, center: [f64; 2], radius: f64) -> Option<([f64; 2], f64, [f64; 4])> {
+        let mut best: Option<([f64; 2], f64, [f64; 4], f64)> = None;
+        for p in &self.prisms {
+            if p.kind != 0 {
+                continue;
+            }
+            let h = p.top - p.base;
+            if !(8.0..=40.0).contains(&h) {
+                continue;
+            }
+            let c = [(p.bb[0] + p.bb[2]) * 0.5, (p.bb[1] + p.bb[3]) * 0.5];
+            if !in_poly(&p.ring, c[0], c[1]) {
+                continue;
+            }
+            let d = (c[0] - pos[0]).hypot(c[1] - pos[1]);
+            if !(16.0..=100.0).contains(&d) {
+                continue;
+            }
+            if (c[0] - center[0]).hypot(c[1] - center[1]) > radius - 18.0 {
+                continue;
+            }
+            let score = d + (h - 16.0).abs() * 0.35;
+            if best.as_ref().map(|b| score < b.3).unwrap_or(true) {
+                best = Some((c, p.top, p.bb, score));
+            }
+        }
+        best.map(|(c, top, bb, _)| (c, top, bb))
+    }
+
+    pub fn dist_bb(bb: [f64; 4], x: f64, y: f64) -> f64 {
+        let dx = (bb[0] - x).max(0.0).max(x - bb[2]);
+        let dy = (bb[1] - y).max(0.0).max(y - bb[3]);
+        dx.hypot(dy)
+    }
+
     /// Bilinear ground height (m).
     pub fn ground(&self, x: f64, y: f64) -> f64 {
         let fx = ((x - self.minx) / self.step).clamp(0.0, (self.nx - 1) as f64 - 1e-6);
